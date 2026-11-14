@@ -127,3 +127,40 @@ npx expo start
 - Press `w` to run in Web Browser.
 - Press `a` to open in Android Emulator / Device.
 - Press `i` to open in iOS Simulator.
+
+---
+
+## 📱 Android APK & Mobile Features
+
+### Package Details
+- **App Name**: Chess Clock Pro
+- **Package ID**: `com.chessclock.pro`
+- **Version**: `1.0.1` (VersionCode `2`)
+- **Prebuilt APK**: `ChessClockPro-v1.0.1.apk` (or `android/app/build/outputs/apk/release/app-release.apk`)
+
+### Mobile Enhancements
+1. **Screen Wake-Lock (`expo-keep-awake`)**: Active match prevents device sleep or display timeout; automatically released upon pause/reset to preserve battery.
+2. **Android Hardware Back Guard (`BackHandler`)**: Closes any open modal dialogs first; if a clock is actively ticking, prompts for exit confirmation so matches are never accidentally interrupted.
+3. **Adaptive Status Bar & Immersive Fullscreen**: Dark theme status bar in portrait mode; immersive fullscreen edge-to-edge layout in landscape orientation for maximum touch targets during time scrambles.
+4. **App Icons & Adaptive Assets**: Clean emerald/graphite chess knight icon in 1024x1024, adaptive vector launcher XMLs, and splash screens.
+
+### How to Install the APK on Android
+1. Transfer `ChessClockPro-v1.0.1.apk` to your Android device via USB, Google Drive, or local file sharing.
+2. Open the file on your device and tap **Install**.
+3. If prompted with *"Install unknown apps"*, enable permission for your browser or file manager to complete installation.
+
+### EAS Build (Cloud / CI)
+```bash
+# Preview build (generates standalone installable APK)
+npx eas build --platform android --profile preview
+
+# Production build (generates Google Play AAB)
+npx eas build --platform android --profile production
+```
+
+### Local Native Build
+```bash
+cd android
+.\gradlew.bat assembleRelease
+```
+The output APK is generated at `android/app/build/outputs/apk/release/app-release.apk`.

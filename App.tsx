@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
+  BackHandler,
+  Platform,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { PlayerClock } from './src/components/PlayerClock';
 import { CenterControlBar } from './src/components/CenterControlBar';
 import { PresetSelector } from './src/components/PresetSelector';
@@ -43,6 +47,70 @@ const MainScreen: React.FC = () => {
     actions.setPreset(config);
   };
 
+  // Screen wake lock during active match to prevent screen from dimming/sleeping
+  useEffect(() => {
+    if (snapshot.status === 'running') {
+      activateKeepAwakeAsync('chess-clock-game').catch(() => {});
+    } else {
+      deactivateKeepAwake('chess-clock-game').catch(() => {});
+    }
+    return () => {
+      deactivateKeepAwake('chess-clock-game').catch(() => {});
+    };
+  }, [snapshot.status]);
+
+  // Android hardware back button handler
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onBackPress = () => {
+      // 1. Close modals if any are open
+      if (customBuilderVisible) {
+        setCustomBuilderVisible(false);
+        return true;
+      }
+      if (presetsVisible) {
+        setPresetsVisible(false);
+        return true;
+      }
+      if (adjustVisible) {
+        setAdjustVisible(false);
+        return true;
+      }
+      if (settingsVisible) {
+        setSettingsVisible(false);
+        return true;
+      }
+
+      // 2. Prevent accidental exit if game is actively running
+      if (snapshot.status === 'running') {
+        actions.togglePause();
+        Alert.alert(
+          'Exit Chess Clock Pro?',
+          'A chess game is currently in progress. Would you like to exit or keep playing?',
+          [
+            { text: 'Keep Playing', style: 'cancel', onPress: () => actions.togglePause() },
+            { text: 'Exit App', style: 'destructive', onPress: () => BackHandler.exitApp() },
+          ],
+          { cancelable: true }
+        );
+        return true;
+      }
+
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [
+    snapshot.status,
+    presetsVisible,
+    customBuilderVisible,
+    adjustVisible,
+    settingsVisible,
+    actions,
+  ]);
+
   const p1Stage =
     snapshot.config.player1.stages[snapshot.player1.currentStageIndex] ||
     snapshot.config.player1.stages[0];
@@ -56,7 +124,12 @@ const MainScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bgApp }]}>
-      <StatusBar hidden={true} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={theme.bgApp}
+        translucent={false}
+        hidden={isLandscape}
+      />
       <View style={styles.centerWrapper}>
         <View
           style={[

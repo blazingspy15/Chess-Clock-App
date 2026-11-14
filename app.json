@@ -2,13 +2,19 @@
   "expo": {
     "name": "Chess Clock Pro",
     "slug": "chess-clock-pro",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#090d16",
-      "resizeMode": "contain"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0c0e12"
+    },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#0c0e12",
+      "translucent": false
     },
     "ios": {
       "supportsTablet": true,
@@ -18,10 +24,12 @@
       }
     },
     "android": {
+      "package": "com.chessclock.pro",
+      "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#090d16"
-      },
-      "package": "com.chessclock.pro"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0c0e12"
+      }
     },
     "plugins": [
       [
@@ -29,7 +37,8 @@
         {
           "initialOrientation": "DEFAULT"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "baseUrl": "/Chess-Clock-App"
