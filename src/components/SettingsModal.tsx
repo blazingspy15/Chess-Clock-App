@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -71,6 +72,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
+            {/* Brand Identity Banner */}
+            <View
+              style={[
+                styles.brandBanner,
+                {
+                  backgroundColor: theme.surfaceElevated,
+                  borderColor: theme.borderSubtle,
+                },
+              ]}
+            >
+              <Image
+                source={require('../../assets/chess-clock-logo.png')}
+                style={styles.brandLogo}
+                resizeMode="contain"
+              />
+              <View style={styles.brandInfo}>
+                <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
+                  Chess Clock Pro
+                </Text>
+                <Text style={[styles.brandSubtitle, { color: theme.accentBlue }]}>
+                  Tournament Edition • v1.0.2
+                </Text>
+                <Text style={[styles.brandDesc, { color: theme.textMuted }]}>
+                  Official high-performance precision clock
+                </Text>
+              </View>
+            </View>
+
             {/* Player Names Section */}
             <Text style={[styles.sectionHeader, { color: theme.accentGold }]}>PLAYER NAMES</Text>
             <View style={styles.nameRow}>
@@ -696,5 +725,37 @@ const styles = StyleSheet.create({
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  brandBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  brandLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    marginRight: 14,
+  },
+  brandInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  brandTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  brandSubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  brandDesc: {
+    fontSize: 11,
+    marginTop: 2,
   },
 });
