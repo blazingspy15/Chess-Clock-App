@@ -30,13 +30,13 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
   onOpenAdjust,
   orientation = 'portrait',
 }) => {
-  const { settings, updateSettings } = useSettings();
+  const { settings, theme, updateSettings } = useSettings();
 
   const handleResetWithConfirm = () => {
     if (status === 'running' || status === 'paused') {
       Alert.alert(
         'Reset Game?',
-        'Are you sure you want to reset the clocks to the beginning?',
+        'Are you sure you want to reset the clocks to the initial time control?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Reset', style: 'destructive', onPress: onReset },
@@ -53,34 +53,38 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
     <View
       style={[
         styles.deadZoneContainer,
+        {
+          backgroundColor: theme.bgApp,
+          borderColor: theme.borderSubtle,
+        },
         orientation === 'landscape' ? styles.landscapeContainer : styles.portraitContainer,
       ]}
     >
-      {/* Preset Name / Change Button */}
+      {/* Preset Name Button */}
       <Pressable
-        style={styles.pillButton}
+        style={[styles.pillButton, { backgroundColor: theme.surfaceElevated }]}
         onPress={onOpenPresets}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Text style={styles.presetText} numberOfLines={1}>
+        <Text style={[styles.presetText, { color: theme.accentBlue }]} numberOfLines={1}>
           {config.name}
         </Text>
       </Pressable>
 
-      {/* Adjust Time Mid-Game Button */}
+      {/* Adjust Time Button */}
       <Pressable
-        style={styles.iconButton}
+        style={[styles.iconButton, { backgroundColor: theme.surfaceElevated }]}
         onPress={onOpenAdjust}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Text style={styles.iconLabel}>⏱️ ±</Text>
       </Pressable>
 
-      {/* Main Play / Pause Button */}
+      {/* Main Action (Start / Pause / Resume) */}
       <Pressable
         style={[
           styles.mainActionButton,
-          isRunning ? styles.pauseButton : styles.playButton,
+          isRunning ? { backgroundColor: theme.accentGold } : { backgroundColor: theme.accentBlue },
         ]}
         onPress={onTogglePause}
       >
@@ -89,9 +93,9 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
         </Text>
       </Pressable>
 
-      {/* Reset Game Button */}
+      {/* Reset Button */}
       <Pressable
-        style={styles.iconButton}
+        style={[styles.iconButton, { backgroundColor: theme.surfaceElevated }]}
         onPress={handleResetWithConfirm}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
@@ -100,7 +104,7 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
 
       {/* Quick Sound Toggle */}
       <Pressable
-        style={styles.iconButton}
+        style={[styles.iconButton, { backgroundColor: theme.surfaceElevated }]}
         onPress={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
@@ -109,7 +113,7 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
 
       {/* Settings Modal Button */}
       <Pressable
-        style={styles.iconButton}
+        style={[styles.iconButton, { backgroundColor: theme.surfaceElevated }]}
         onPress={onOpenSettings}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
@@ -121,9 +125,6 @@ export const CenterControlBar: React.FC<CenterControlBarProps> = ({
 
 const styles = StyleSheet.create({
   deadZoneContainer: {
-    backgroundColor: '#090d16',
-    borderColor: '#1e293b',
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 10,
@@ -131,61 +132,53 @@ const styles = StyleSheet.create({
   },
   portraitContainer: {
     width: '100%',
-    height: 58,
-    borderTopWidth: 2,
-    borderBottomWidth: 2,
-    paddingHorizontal: 12,
+    height: 60,
+    borderTopWidth: 1.5,
+    borderBottomWidth: 1.5,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
   },
   landscapeContainer: {
-    width: 64,
+    width: 68,
     height: '100%',
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
     flexDirection: 'column',
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   pillButton: {
-    backgroundColor: '#1e293b',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 16,
-    maxWidth: 90,
+    maxWidth: 96,
   },
   presetText: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   mainActionButton: {
     paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playButton: {
-    backgroundColor: '#2563eb',
-  },
-  pauseButton: {
-    backgroundColor: '#b45309',
-  },
   mainActionText: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 1,
   },
   iconButton: {
     padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#1e293b',
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 36,
+    minWidth: 38,
+    minHeight: 38,
   },
   iconLabel: {
-    fontSize: 14,
-    color: '#e2e8f0',
+    fontSize: 15,
   },
 });

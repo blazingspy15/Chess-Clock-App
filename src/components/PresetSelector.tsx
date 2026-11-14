@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { PRESET_TIME_CONTROLS } from '../engine/presets';
-import { TimeControlCategory, TimeControlConfig } from '../engine/types';
+import { TimeControlConfig } from '../engine/types';
 import { useSettings } from '../state/SettingsContext';
 
 interface PresetSelectorProps {
@@ -26,7 +26,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
   onOpenCustomBuilder,
   onClose,
 }) => {
-  const { customPresets, deleteCustomPreset } = useSettings();
+  const { customPresets, deleteCustomPreset, theme } = useSettings();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const categories = [
@@ -34,7 +34,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     { id: 'bullet', label: 'Bullet' },
     { id: 'blitz', label: 'Blitz' },
     { id: 'rapid', label: 'Rapid' },
-    { id: 'classical', label: 'Tournament' },
+    { id: 'classical', label: 'Classical' },
     { id: 'custom', label: 'Custom' },
   ];
 
@@ -48,12 +48,23 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContent}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.borderSubtle,
+            },
+          ]}
+        >
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.title}>Time Controls</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Time Controls</Text>
+            <Pressable
+              onPress={onClose}
+              style={[styles.closeBtn, { backgroundColor: theme.surfaceElevated }]}
+            >
+              <Text style={[styles.closeBtnText, { color: theme.textSecondary }]}>✕</Text>
             </Pressable>
           </View>
 
@@ -64,25 +75,30 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             style={styles.categoryScroll}
             contentContainerStyle={styles.categoryContainer}
           >
-            {categories.map(cat => (
-              <Pressable
-                key={cat.id}
-                style={[
-                  styles.categoryPill,
-                  selectedCategory === cat.id && styles.activeCategoryPill,
-                ]}
-                onPress={() => setSelectedCategory(cat.id)}
-              >
-                <Text
+            {categories.map(cat => {
+              const isCatActive = selectedCategory === cat.id;
+              return (
+                <Pressable
+                  key={cat.id}
                   style={[
-                    styles.categoryPillText,
-                    selectedCategory === cat.id && styles.activeCategoryPillText,
+                    styles.categoryPill,
+                    {
+                      backgroundColor: isCatActive ? theme.accentBlue : theme.surfaceElevated,
+                    },
                   ]}
+                  onPress={() => setSelectedCategory(cat.id)}
                 >
-                  {cat.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.categoryPillText,
+                      { color: isCatActive ? '#ffffff' : theme.textMuted },
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           {/* Preset Cards Grid */}
@@ -97,7 +113,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                     key={preset.id}
                     style={[
                       styles.presetCard,
-                      isSelected && styles.selectedPresetCard,
+                      {
+                        backgroundColor: isSelected ? theme.surfaceActive : theme.surfaceElevated,
+                        borderColor: isSelected ? theme.borderActive : theme.borderSubtle,
+                      },
                     ]}
                     onPress={() => {
                       onSelectPreset(preset);
@@ -108,7 +127,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                       <Text
                         style={[
                           styles.presetName,
-                          isSelected && styles.selectedPresetName,
+                          { color: isSelected ? '#ffffff' : theme.textPrimary },
                         ]}
                       >
                         {preset.name}
@@ -120,11 +139,32 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                       ) : null}
                     </View>
 
-                    <Text style={styles.presetDesc}>{preset.description}</Text>
+                    <Text
+                      style={[
+                        styles.presetDesc,
+                        { color: isSelected ? theme.activeSubTextColor : theme.textMuted },
+                      ]}
+                    >
+                      {preset.description}
+                    </Text>
 
                     <View style={styles.tagContainer}>
-                      <View style={styles.timingMethodTag}>
-                        <Text style={styles.timingMethodText}>
+                      <View
+                        style={[
+                          styles.timingMethodTag,
+                          {
+                            backgroundColor: isSelected
+                              ? 'rgba(0, 0, 0, 0.25)'
+                              : theme.surface,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.timingMethodText,
+                            { color: isSelected ? '#ffffff' : theme.accentBlue },
+                          ]}
+                        >
                           {p1Stage.timingMethod.toUpperCase()}
                         </Text>
                       </View>
@@ -150,15 +190,23 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
               })}
             </View>
 
-            {/* Custom Time Control / Handicap Builder Button */}
+            {/* Custom Builder Button */}
             <Pressable
-              style={styles.customBuilderButton}
+              style={[
+                styles.customBuilderButton,
+                {
+                  borderColor: theme.accentBlue,
+                  backgroundColor: theme.surfaceElevated,
+                },
+              ]}
               onPress={() => {
                 onClose();
                 onOpenCustomBuilder();
               }}
             >
-              <Text style={styles.customBuilderText}>+ Create Custom / Handicap Preset</Text>
+              <Text style={[styles.customBuilderText, { color: theme.accentBlue }]}>
+                + Create Custom / Handicap / Stage Preset
+              </Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -174,13 +222,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#0f172a',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '85%',
     padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
   },
   headerRow: {
     flexDirection: 'row',
@@ -191,19 +237,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#f8fafc',
+    letterSpacing: 0.5,
   },
   closeBtn: {
     padding: 6,
     borderRadius: 16,
-    backgroundColor: '#1e293b',
     width: 32,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    color: '#94a3b8',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -219,19 +263,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#1e293b',
     marginRight: 8,
   },
-  activeCategoryPill: {
-    backgroundColor: '#2563eb',
-  },
   categoryPillText: {
-    color: '#94a3b8',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-  },
-  activeCategoryPillText: {
-    color: '#ffffff',
   },
   presetsList: {
     marginBottom: 12,
@@ -243,16 +279,10 @@ const styles = StyleSheet.create({
   },
   presetCard: {
     width: '48%',
-    backgroundColor: '#1e293b',
     borderRadius: 14,
-    padding: 14,
+    padding: 13,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: '#334155',
-  },
-  selectedPresetCard: {
-    borderColor: '#22c55e',
-    backgroundColor: '#064e3b',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -261,17 +291,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   presetName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#f8fafc',
-  },
-  selectedPresetName: {
-    color: '#4ade80',
   },
   presetDesc: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginBottom: 10,
+    fontSize: 11,
+    marginBottom: 8,
+    fontWeight: '600',
   },
   handicapBadge: {
     backgroundColor: '#7c2d12',
@@ -289,14 +315,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timingMethodTag: {
-    backgroundColor: '#0f172a',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     marginRight: 6,
   },
   timingMethodText: {
-    color: '#38bdf8',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -318,22 +342,19 @@ const styles = StyleSheet.create({
   deleteCustomText: {
     color: '#f87171',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   customBuilderButton: {
-    backgroundColor: '#1e293b',
     borderWidth: 1.5,
-    borderColor: '#38bdf8',
     borderStyle: 'dashed',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 20,
+    marginTop: 4,
+    marginBottom: 24,
   },
   customBuilderText: {
-    color: '#38bdf8',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
 });

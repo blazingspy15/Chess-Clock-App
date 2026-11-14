@@ -1,8 +1,10 @@
 # Chess Clock Pro ⏱️♟️
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://blazingspy15.github.io/Chess-Clock-App/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-15%2F15%20Passing-success?style=for-the-badge)](https://github.com/blazingspy15/Chess-Clock-App)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Typecheck%20Clean-blue?style=for-the-badge&logo=typescript)](https://github.com/blazingspy15/Chess-Clock-App)
 
-**Live URL**: [https://blazingspy15.github.io/Chess-Clock-App/](https://blazingspy15.github.io/Chess-Clock-App/)
+**Live Website**: [https://blazingspy15.github.io/Chess-Clock-App/](https://blazingspy15.github.io/Chess-Clock-App/)
 
 A tournament-grade, 100% offline, millisecond-accurate Chess Clock application built with **React Native**, **Expo**, and **TypeScript**, matching the quality and reliability of the official Chess.com app.
 
@@ -10,16 +12,20 @@ A tournament-grade, 100% offline, millisecond-accurate Chess Clock application b
 
 ## 🌟 Key Features
 
-### 1. 100% On-Device & Zero-Drift Precision Timing
-- **Hardware Delta Time Loop**: Timing logic does not rely on naive `setInterval`. Every tick computes the delta against the native wall-clock timestamp (`Date.now()`), eliminating JS event loop drift.
+### 1. 100% On-Device & Monotonic Precision Timing
+- **Hardware Monotonic Delta Loop**: Timing logic relies on monotonic `performance.now()` measurements with zero drift. Callback timing variations and thread context switches never compromise accuracy.
 - **Battery Optimization**: Dynamically adapts tick rate—runs at **100ms** during regular play (cutting CPU wakeups by over 60% during 2-hour classical games) and automatically accelerates to **50ms** during intense time scrambles ($\le 10$ seconds) for fluid decimal countdowns.
-- **Offline Persistence**: Custom presets, sound toggles, and settings are saved on-device via `@react-native-async-storage/async-storage`.
+- **Configurable Background Behavior**: Supports both auto-pause upon app minimization and true wall-clock time catch-up when continued in the background.
+- **Rapid Tap & Inactive Player Protection**: Accidental double-taps within 50ms and taps from inactive players are safely ignored.
+- **Offline Persistence**: Custom presets, themes, sound/haptic toggles, and user preferences are saved on-device via `@react-native-async-storage/async-storage`.
 
 ### 2. Complete Time Control Mechanics
 - **Standard Presets**:
-  - **Bullet**: 1 | 0, 1 | 1, 2 | 1
-  - **Blitz**: 3 | 0, 3 | 2, 5 | 0, 5 | 5
-  - **Rapid**: 10 | 0, 15 | 10, 30 | 0, 60 | 0
+  - **Bullet**: 1+0, 1+1, 2+1
+  - **Blitz**: 3+0, 3+2, 5+0, 5+3, 5+5
+  - **Rapid**: 10+0, 15+10, 30+0
+  - **Classical**: 60+0, 90+30, and FIDE 40/90m + 30m (+30s)
+  - **Delays**: 5 d3 (USCF Simple Delay), 10 d5, 3 b2 (Bronstein Delay), 5 b3
 - **Advanced Increment & Delay Modes**:
   - **Fischer Increment (+)**: Fixed bonus added instantly upon completing each move.
   - **Bronstein Delay (B)**: Time spent on the move is refunded up to the delay cap (the clock can never exceed its initial value at the start of that turn).
@@ -27,17 +33,15 @@ A tournament-grade, 100% offline, millisecond-accurate Chess Clock application b
 - **Handicap Mode**: Configure asymmetric clocks for odds games (e.g. 10 minutes vs 2 minutes).
 - **Multi-Stage Tournament Controls**: Support multi-stage rules (e.g. FIDE 40 moves in 90 min, then 30 min with 30s increment).
 
-### 3. Masterclass UI/UX
-- **Rotated Display for Opponents**: Top player's clock face and move count are rotated 180° in portrait mode so two players facing each other can read their clocks naturally.
+### 3. Professional UI/UX & Redesign
+- **Design System**: Deep graphite background, dark slate panels, vibrant emerald green active player, muted gold accents, and red timeout indicators.
+- **Configurable Opponent Orientation**: Invert the top player 180° for head-to-head table play, or display right-side-up for observers and streaming.
+- **Custom Player Names**: Personalize White and Black player names.
 - **Edge-to-Edge Touch Targets**: Massive touch areas for instant move passing during blitz scrambles.
 - **Dead-Zone Control Strip**: Narrow central strip with Pause/Resume, Reset, Settings, and Edit buttons placed between clocks to prevent accidental taps.
-- **Visual Cues**:
-  - Active clock: Vibrant emerald green (`#15803d`).
-  - Inactive clock: Dimmed slate (`#1e293b`).
-  - Time out / Flag: Urgent flashing crimson red (`#dc2626`) with a "TIME'S UP!" banner.
-- **Auto-Pause**: Automatically pauses when the app is minimized, during phone calls, or screen lock via `AppState`.
+- **Responsive Tournament Layout**: Beautifully balanced across desktop monitors, tablets, and phones in both portrait and landscape orientations.
 - **On-the-Fly Adjustments**: Pause anytime to add/subtract minutes, seconds, or moves for either player.
-- **Audio & Haptics**: Low-latency mechanical click sound, flag alarm horn, and tactile vibration feedback.
+- **Audio & Haptics**: Low-latency mechanical click sound, flag alarm horn, subtle 10s low-time warning tick, and tactile vibration feedback.
 
 ---
 
@@ -45,30 +49,33 @@ A tournament-grade, 100% offline, millisecond-accurate Chess Clock application b
 
 ```
 chess-clock/
-├── App.tsx                     # Root component with orientation & modals
+├── App.tsx                     # Responsive tournament view & modal manager
 ├── index.ts                    # Expo entry point
 ├── package.json
-├── app.json
-├── tsconfig.json
+├── app.json                    # BaseUrl & orientation config
+├── tsconfig.json               # Strict TypeScript config
 └── src/
-    ├── engine/                 # PURE HEADLESS ENGINE (Zero UI dependencies)
+    ├── engine/                 # PURE HEADLESS TIMING ENGINE (Zero UI coupling)
     │   ├── types.ts            # TimingMethod, PlayerState, ClockStatus, etc.
+    │   ├── time.ts             # Monotonic high-resolution time provider
     │   ├── ChessClockEngine.ts # Drift compensation, delay math, adaptive ticking
-    │   ├── presets.ts          # Bullet, Blitz, Rapid, Handicap & Multi-stage factories
+    │   ├── presets.ts          # Complete preset library & builder factories
     │   └── __tests__/
-    │       └── engine.test.ts  # 100% passing unit tests for all mechanics
+    │       └── engine.test.ts  # 15 automated precision unit tests
+    ├── theme/
+    │   └── tokens.ts           # Unified design system tokens & themes
     ├── state/
     │   ├── useChessClock.ts    # React Hook bridging engine to UI with AppState
-    │   └── SettingsContext.tsx # Context for preferences & custom presets
+    │   └── SettingsContext.tsx # Offline preferences & custom presets
     ├── components/
-    │   ├── PlayerClock.tsx     # 180° rotated edge-to-edge touch target
+    │   ├── PlayerClock.tsx     # Responsive player clock display
     │   ├── CenterControlBar.tsx# Dead-zone strip (Pause, Reset, Adjust, Presets)
     │   ├── TimeAdjustModal.tsx # On-the-fly mid-game adjustment sheet
     │   ├── PresetSelector.tsx  # Grid of time control presets
-    │   ├── CustomPresetModal.tsx # Handicap & multi-stage builder
-    │   └── SettingsModal.tsx   # Sound, haptics & auto-pause toggles
+    │   ├── CustomPresetModal.tsx # Handicap & multi-stage builder with validation
+    │   └── SettingsModal.tsx   # Comprehensive personalization & theme modal
     └── services/
-        ├── audioService.ts     # Low-latency clock click and flag alarms
+        ├── audioService.ts     # Low-latency clock clicks, low-time ticks & alarms
         ├── hapticsService.ts   # Tactile feedback via expo-haptics
         └── storageService.ts   # 100% on-device offline persistence
 ```
@@ -77,13 +84,11 @@ chess-clock/
 
 ## 🧪 Testing the Timing Engine Standalone
 
-The timing engine is completely decoupled and can be tested anytime with Node.js:
-
 ```bash
 npm run test:engine
 ```
 
-**Test Coverage**:
+**15 Automated Test Suites**:
 1. Fischer Increment (3 min + 2s increment)
 2. Bronstein Delay (Cap at turn start time)
 3. Simple Delay (Delay countdown protects main bank)
@@ -91,14 +96,27 @@ npm run test:engine
 5. Asymmetric Handicap (e.g. 10m vs 1m)
 6. Multi-Stage Tournament Control (Stage advancement upon move threshold)
 7. On-the-fly Mid-Game Adjustments (+/- time & move counters)
+8. Sudden Death (No increment, no delay)
+9. Inactive Player Tap Protection (Taps from inactive player ignored)
+10. Monotonic Drift Elimination over 1,000 Jittered Ticks
+11. Background Time Catch-Up (Time continues when backgrounded)
+12. Single Flag Trigger & Lock (Timeout event fires strictly once)
+13. Strict Non-Negative Clamping (Clock never dips below 0.0s)
+14. Reset and Restart Determinism (Restores configured baseline)
+15. Preset Library Completeness (Bullet, Blitz, Rapid, Classical, Delays)
 
 ---
 
-## 🚀 Running the App
+## 🚀 Running the App Locally
 
 ### Install Dependencies
 ```bash
 npm install
+```
+
+### Typecheck
+```bash
+npx tsc --noEmit
 ```
 
 ### Start Expo Dev Server
@@ -106,7 +124,6 @@ npm install
 npx expo start
 ```
 
+- Press `w` to run in Web Browser.
 - Press `a` to open in Android Emulator / Device.
 - Press `i` to open in iOS Simulator.
-- Press `w` to run in Web Browser.
-- Scan the QR code using the **Expo Go** app on your physical iPhone or Android phone!

@@ -10,6 +10,7 @@ import type {
   TimeControlConfig,
 } from './types.ts';
 import { DEFAULT_TIME_CONTROL } from './presets.ts';
+import { getMonotonicTime } from './time.ts';
 
 export class ChessClockEngine {
   private config: TimeControlConfig;
@@ -24,9 +25,13 @@ export class ChessClockEngine {
   private lastTickTime: number = 0;
   private totalElapsedMs: number = 0;
   private lastMoveTimestamp: number | null = null;
+  private lastSwitchTimestamp: number = 0;
 
   private tickTimerId: any = null;
   private currentTickIntervalMs: number = 100;
+
+  // Minimum interval between turn switch taps to prevent double-tap bounces during scrambles
+  private static readonly MIN_SWITCH_INTERVAL_MS = 60;
 
   private listeners: Map<EngineEventName, Set<EngineEventListener>> = new Map();
 
@@ -77,6 +82,8 @@ export class ChessClockEngine {
     if (this.status === 'running') return;
     if (this.status === 'flagged') return;
 
+    const now = startTime ?? getMonotonicTime();
+
     if (this.status === 'ready' || this.activePlayer === null) {
       this.activePlayer = firstPlayer;
       const activeState = this.getPlayerState(firstPlayer);
@@ -90,7 +97,8 @@ export class ChessClockEngine {
     }
 
     this.status = 'running';
-    this.lastTickTime = startTime ?? Date.now();
+    this.lastTickTime = now;
+    this.lastSwitchTimestamp = now;
     this.startTickLoop();
     this.emit('resume');
   }
@@ -101,18 +109,28 @@ export class ChessClockEngine {
    * and transfers turn to the opponent.
    */
   public switchTurn(requestingPlayer?: PlayerId, switchTime?: number): void {
-    // If not running, pressing a player's side can start the clock with the opponent active!
+    const now = switchTime ?? getMonotonicTime();
+
+    // If not running, pressing a player's side starts the clock with the opponent active
     if (this.status === 'ready') {
       const active = requestingPlayer ? (requestingPlayer === 1 ? 2 : 1) : 2;
-      this.start(active, switchTime);
+      this.start(active, now);
       return;
     }
 
     if (this.status !== 'running') return;
     if (this.activePlayer === null) return;
 
-    // Optional guard: if requestingPlayer is provided and does not match activePlayer, ignore
+    // Guard: if requestingPlayer is provided and does not match activePlayer, ignore
     if (requestingPlayer && requestingPlayer !== this.activePlayer) {
+      return;
+    }
+
+    // First, process any pending elapsed delta up to this exact moment
+    this.tick(now);
+
+    // If that tick caused a flag, stop immediately
+    if ((this.status as ClockStatus) === 'flagged') {
       return;
     }
 
@@ -183,9 +201,8 @@ export class ChessClockEngine {
       nextPlayerState.currentDelayRemainingMs = nextPlayerStage.incrementMs;
     }
 
-    const now = switchTime ?? Date.now();
     this.lastTickTime = now;
-    this.lastMoveTimestamp = now;
+    this.lastMoveTimestamp = Date.now();
 
     // Dynamically adjust tick rate if moving into / out of low time scramble
     this.adjustTickRateIfNeeded();
@@ -203,6 +220,9 @@ export class ChessClockEngine {
   public pause(): void {
     if (this.status !== 'running') return;
 
+    // Apply any pending delta right up to the pause action
+    this.tick(getMonotonicTime());
+
     this.stopTickTimer();
     this.status = 'paused';
     this.emit('pause');
@@ -211,13 +231,22 @@ export class ChessClockEngine {
   /**
    * Resumes a paused clock.
    */
-  public resume(): void {
+  public resume(resumeTime?: number): void {
     if (this.status !== 'paused') return;
 
     this.status = 'running';
-    this.lastTickTime = Date.now();
+    this.lastTickTime = resumeTime ?? getMonotonicTime();
     this.startTickLoop();
     this.emit('resume');
+  }
+
+  /**
+   * Catches up elapsed time (useful when returning from browser backgrounding
+   * or when device sleeps without auto-pause).
+   */
+  public catchUp(forcedNow?: number): void {
+    if (this.status !== 'running') return;
+    this.tick(forcedNow);
   }
 
   /**
@@ -231,6 +260,7 @@ export class ChessClockEngine {
     this.winner = null;
     this.totalElapsedMs = 0;
     this.lastMoveTimestamp = null;
+    this.lastSwitchTimestamp = 0;
 
     this.player1State = this.createInitialPlayerState(this.config.player1);
     this.player2State = this.createInitialPlayerState(this.config.player2);
@@ -306,13 +336,13 @@ export class ChessClockEngine {
 
   /**
    * Precision Delta Tick:
-   * Calculates exact wall-clock difference since last tick, ensuring zero drift.
+   * Calculates exact wall-clock difference since last tick, ensuring zero cumulative drift.
    */
   public tick(forcedNow?: number): void {
     if (this.status !== 'running' || this.activePlayer === null) return;
 
-    const now = forcedNow ?? Date.now();
-    const deltaMs = now - this.lastTickTime;
+    const now = forcedNow ?? getMonotonicTime();
+    const deltaMs = Math.max(0, now - this.lastTickTime);
     this.lastTickTime = now;
     this.totalElapsedMs += deltaMs;
 
@@ -322,17 +352,17 @@ export class ChessClockEngine {
     // Apply Simple Delay Countdown if applicable
     if (activeStage.timingMethod === 'delay' && activeState.currentDelayRemainingMs > 0) {
       const delayDeduction = Math.min(deltaMs, activeState.currentDelayRemainingMs);
-      activeState.currentDelayRemainingMs -= delayDeduction;
+      activeState.currentDelayRemainingMs = Math.max(0, activeState.currentDelayRemainingMs - delayDeduction);
 
       const remainingDelta = deltaMs - delayDeduction;
       if (remainingDelta > 0) {
-        activeState.timeRemainingMs -= remainingDelta;
+        activeState.timeRemainingMs = Math.max(0, activeState.timeRemainingMs - remainingDelta);
       }
     } else {
-      activeState.timeRemainingMs -= deltaMs;
+      activeState.timeRemainingMs = Math.max(0, activeState.timeRemainingMs - deltaMs);
     }
 
-    // Check for Flag (Time Out)
+    // Check for Flag (Time Out) - Triggered exactly once
     if (activeState.timeRemainingMs <= 0) {
       activeState.timeRemainingMs = 0;
       activeState.isFlagged = true;

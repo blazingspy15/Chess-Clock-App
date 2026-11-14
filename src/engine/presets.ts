@@ -16,10 +16,16 @@ export function createSymmetricConfig(
     timingMethod: incrementSeconds > 0 ? timingMethod : 'none',
   };
 
+  const formattedDesc =
+    description ||
+    (incrementSeconds > 0
+      ? `${Math.floor(baseTimeSeconds / 60)}m + ${incrementSeconds}s`
+      : `${Math.floor(baseTimeSeconds / 60)} min`);
+
   return {
     id,
     name,
-    description: description || `${Math.floor(baseTimeSeconds / 60)} | ${incrementSeconds}`,
+    description: formattedDesc,
     category,
     player1: { stages: [{ ...stage }] },
     player2: { stages: [{ ...stage }] },
@@ -104,18 +110,23 @@ export const PRESET_TIME_CONTROLS: TimeControlConfig[] = [
   createSymmetricConfig('blitz_3_0', '3 min', 'blitz', 180, 0, 'none', '3 | 0 Blitz'),
   createSymmetricConfig('blitz_3_2', '3 | 2', 'blitz', 180, 2, 'fischer', '3m + 2s Fischer'),
   createSymmetricConfig('blitz_5_0', '5 min', 'blitz', 300, 0, 'none', '5 | 0 Blitz'),
+  createSymmetricConfig('blitz_5_3', '5 | 3', 'blitz', 300, 3, 'fischer', '5m + 3s Fischer'),
   createSymmetricConfig('blitz_5_5', '5 | 5', 'blitz', 300, 5, 'fischer', '5m + 5s Fischer'),
 
   // Rapid
   createSymmetricConfig('rapid_10_0', '10 min', 'rapid', 600, 0, 'none', '10 | 0 Rapid'),
   createSymmetricConfig('rapid_15_10', '15 | 10', 'rapid', 900, 10, 'fischer', '15m + 10s Fischer'),
   createSymmetricConfig('rapid_30_0', '30 min', 'rapid', 1800, 0, 'none', '30 | 0 Rapid'),
-  createSymmetricConfig('rapid_60_0', '60 min', 'rapid', 3600, 0, 'none', '60 | 0 Classical / Long'),
+
+  // Classical
+  createSymmetricConfig('classical_60_0', '60 min', 'classical', 3600, 0, 'none', '60 | 0 Classical'),
+  createSymmetricConfig('classical_90_30', '90 | 30', 'classical', 5400, 30, 'fischer', '90m + 30s Classical'),
 
   // Delay Presets (USCF standard delay & Bronstein)
   createSymmetricConfig('blitz_5_d3', '5 d3', 'blitz', 300, 3, 'delay', '5 min + 3s Simple Delay'),
   createSymmetricConfig('rapid_10_d5', '10 d5', 'rapid', 600, 5, 'delay', '10 min + 5s Simple Delay'),
   createSymmetricConfig('blitz_3_b2', '3 b2', 'blitz', 180, 2, 'bronstein', '3 min + 2s Bronstein Delay'),
+  createSymmetricConfig('blitz_5_b3', '5 b3', 'blitz', 300, 3, 'bronstein', '5 min + 3s Bronstein Delay'),
 
   // Multi-Stage Tournament (FIDE Standard)
   createMultiStageConfig('fide_standard', 'FIDE 40/90m + 30m', [

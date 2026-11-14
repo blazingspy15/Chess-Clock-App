@@ -7,9 +7,11 @@ import {
   View,
 } from 'react-native';
 import { ClockStatus, PlayerClockState, Stage } from '../engine/types';
+import { useSettings } from '../state/SettingsContext';
 
 interface PlayerClockProps {
   playerNumber: 1 | 2;
+  playerName: string;
   clockState: PlayerClockState;
   stage: Stage;
   formattedTime: string;
@@ -24,6 +26,7 @@ interface PlayerClockProps {
 
 export const PlayerClock: React.FC<PlayerClockProps> = ({
   playerNumber,
+  playerName,
   clockState,
   stage,
   formattedTime,
@@ -35,59 +38,64 @@ export const PlayerClock: React.FC<PlayerClockProps> = ({
   onPress,
   orientation = 'portrait',
 }) => {
+  const { theme } = useSettings();
   const isFlagged = clockState.isFlagged;
   const isPaused = status === 'paused';
   const isReady = status === 'ready';
+  const isLowTime = clockState.timeRemainingMs <= 10000 && clockState.timeRemainingMs > 0;
 
   // Flash animation for 0:00 Flag
   const flashAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (isFlagged) {
-      Animated.loop(
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(flashAnim, {
-            toValue: 0.3,
-            duration: 350,
+            toValue: 0.35,
+            duration: 320,
             useNativeDriver: true,
           }),
           Animated.timing(flashAnim, {
             toValue: 1,
-            duration: 350,
+            duration: 320,
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      loop.start();
+      return () => loop.stop();
     } else {
       flashAnim.setValue(1);
     }
   }, [isFlagged, flashAnim]);
 
   // Determine Background Color
-  let bgColor = '#1e293b'; // Default Inactive Slate
+  let bgColor = theme.surfaceInactive;
 
   if (isFlagged) {
-    bgColor = '#dc2626'; // Urgent Crimson Red
+    bgColor = theme.surfaceFlagged;
   } else if (isActive && isClockRunning) {
-    bgColor = '#15803d'; // Vibrant Energetic Green
+    bgColor = theme.surfaceActive;
   } else if (isActive && isPaused) {
-    bgColor = '#166534'; // Calmer forest green when paused
+    bgColor = theme.surfacePaused;
   } else if (isReady) {
-    bgColor = playerNumber === 1 ? '#1e293b' : '#334155'; // Subtle distinction before start
+    bgColor = playerNumber === 1 ? theme.surfaceInactive : theme.surface;
   }
 
   // Determine Text Colors
-  const textColor = isFlagged
-    ? '#ffffff'
-    : isActive
-    ? '#ffffff'
-    : '#94a3b8';
+  let textColor = theme.textMuted;
+  let subTextColor = theme.textMuted;
 
-  const subTextColor = isFlagged
-    ? '#fee2e2'
-    : isActive
-    ? '#bbf7d0'
-    : '#64748b';
+  if (isFlagged) {
+    textColor = '#ffffff';
+    subTextColor = theme.flagSubText;
+  } else if (isActive) {
+    textColor = theme.activeTextColor;
+    subTextColor = theme.activeSubTextColor;
+  } else if (isLowTime) {
+    textColor = theme.accentGold;
+  }
 
   return (
     <Animated.View
@@ -97,6 +105,7 @@ export const PlayerClock: React.FC<PlayerClockProps> = ({
           backgroundColor: bgColor,
           opacity: isFlagged ? flashAnim : 1,
           transform: isRotated ? [{ rotate: '180deg' }] : [],
+          borderColor: isLowTime && isActive ? theme.accentGold : theme.borderSubtle,
         },
       ]}
     >
@@ -105,37 +114,37 @@ export const PlayerClock: React.FC<PlayerClockProps> = ({
         onPress={onPress}
         android_disableSound={true}
       >
-        {/* Top Info Bar (Move count & Time Control / Stage) */}
+        {/* Top Info Bar: Player Name, Move Count, Stage */}
         <View style={styles.topInfoBar}>
-          <View style={styles.badge}>
+          <View style={[styles.badge, { backgroundColor: 'rgba(0, 0, 0, 0.3)' }]}>
             <Text style={[styles.badgeText, { color: subTextColor }]}>
-              {playerNumber === 1 ? 'WHITE' : 'BLACK'}
+              {playerName.toUpperCase()}
             </Text>
           </View>
 
-          <View style={styles.badge}>
+          <View style={[styles.badge, { backgroundColor: 'rgba(0, 0, 0, 0.3)' }]}>
             <Text style={[styles.badgeText, { color: subTextColor }]}>
               MOVE {clockState.moveCount}
             </Text>
           </View>
 
           {stage.movesThreshold ? (
-            <View style={[styles.badge, styles.stageBadge]}>
-              <Text style={[styles.badgeText, { color: '#fbbf24' }]}>
+            <View style={[styles.badge, { backgroundColor: 'rgba(217, 119, 6, 0.25)' }]}>
+              <Text style={[styles.badgeText, { color: theme.accentGold }]}>
                 STAGE {clockState.currentStageIndex + 1}
               </Text>
             </View>
           ) : null}
         </View>
 
-        {/* Main Clock Face */}
+        {/* Center Main Clock Digits */}
         <View style={styles.timeWrapper}>
           <Text
             style={[
               styles.timeText,
               {
                 color: textColor,
-                fontSize: orientation === 'landscape' ? 70 : 84,
+                fontSize: orientation === 'landscape' ? 68 : 82,
               },
             ]}
             numberOfLines={1}
@@ -144,14 +153,14 @@ export const PlayerClock: React.FC<PlayerClockProps> = ({
             {formattedTime}
           </Text>
 
-          {/* Simple Delay Countdown Indicator */}
+          {/* Simple Delay Indicator */}
           {delayFormatted ? (
             <View style={styles.delayBadge}>
               <Text style={styles.delayText}>DELAY {delayFormatted}</Text>
             </View>
           ) : null}
 
-          {/* Flag / Time's Up Banner */}
+          {/* Flagged / Time's Up Banner */}
           {isFlagged ? (
             <View style={styles.flagBanner}>
               <Text style={styles.flagText}>TIME'S UP!</Text>
@@ -159,7 +168,7 @@ export const PlayerClock: React.FC<PlayerClockProps> = ({
           ) : null}
         </View>
 
-        {/* Bottom Turn Status Indicator */}
+        {/* Bottom Turn Hint Indicator */}
         <View style={styles.bottomInfoBar}>
           <Text style={[styles.statusHint, { color: subTextColor }]}>
             {isFlagged
@@ -183,6 +192,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     overflow: 'hidden',
+    borderWidth: 1,
   },
   pressableArea: {
     flex: 1,
@@ -190,7 +200,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
   },
   topInfoBar: {
     flexDirection: 'row',
@@ -199,19 +209,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   badge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  stageBadge: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
-  },
   badgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   timeWrapper: {
     justifyContent: 'center',
@@ -221,7 +226,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
-    letterSpacing: -1.5,
+    letterSpacing: -1,
     textAlign: 'center',
     fontFamily: 'monospace',
   },
@@ -229,18 +234,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 14,
     paddingVertical: 4,
-    borderRadius: 16,
+    borderRadius: 14,
     marginTop: 6,
   },
   delayText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   flagBanner: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: 18,
     paddingVertical: 6,
     borderRadius: 8,
     marginTop: 8,
@@ -255,9 +260,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusHint: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1.5,
-    textTransform: 'uppercase',
   },
 });

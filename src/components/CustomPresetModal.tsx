@@ -29,10 +29,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   onClose,
   onApplyConfig,
 }) => {
-  const { addCustomPreset } = useSettings();
+  const { addCustomPreset, theme } = useSettings();
 
   const [mode, setMode] = useState<BuilderMode>('symmetric');
   const [presetName, setPresetName] = useState('Custom');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Symmetric State
   const [symMinutes, setSymMinutes] = useState('5');
@@ -67,49 +68,89 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   ];
 
   const handleSaveAndApply = async () => {
+    setErrorMessage(null);
     let config: TimeControlConfig;
 
     if (mode === 'symmetric') {
-      const baseSec = (parseInt(symMinutes, 10) || 0) * 60 + (parseInt(symSeconds, 10) || 0);
-      const incSec = parseInt(symIncSeconds, 10) || 0;
-      const name = presetName || `${symMinutes}|${symIncSeconds}`;
+      const min = parseInt(symMinutes, 10);
+      const sec = parseInt(symSeconds, 10);
+      const inc = parseInt(symIncSeconds, 10);
 
+      if (isNaN(min) || min < 0 || isNaN(sec) || sec < 0) {
+        setErrorMessage('Minutes and seconds must be positive numbers.');
+        return;
+      }
+      const totalSec = min * 60 + sec;
+      if (totalSec < 1) {
+        setErrorMessage('Total starting time must be at least 1 second.');
+        return;
+      }
+      if (isNaN(inc) || inc < 0) {
+        setErrorMessage('Increment cannot be negative.');
+        return;
+      }
+
+      const name = presetName.trim() || `${min}|${inc}`;
       config = createSymmetricConfig(
         `custom_${Date.now()}`,
         name,
         'custom',
-        baseSec,
-        incSec,
+        totalSec,
+        inc,
         symMethod,
         `${name} (${symMethod})`
       );
     } else if (mode === 'handicap') {
-      const p1Base = (parseInt(p1Minutes, 10) || 0) * 60;
-      const p1Inc = parseInt(p1IncSeconds, 10) || 0;
-      const p2Base = (parseInt(p2Minutes, 10) || 0) * 60;
-      const p2Inc = parseInt(p2IncSeconds, 10) || 0;
-      const name = presetName || `Handicap ${p1Minutes}m vs ${p2Minutes}m`;
+      const p1Min = parseInt(p1Minutes, 10);
+      const p1Inc = parseInt(p1IncSeconds, 10);
+      const p2Min = parseInt(p2Minutes, 10);
+      const p2Inc = parseInt(p2IncSeconds, 10);
 
+      if (isNaN(p1Min) || p1Min < 0 || isNaN(p2Min) || p2Min < 0) {
+        setErrorMessage('Both players must have valid time settings.');
+        return;
+      }
+      if (p1Min * 60 < 1 || p2Min * 60 < 1) {
+        setErrorMessage('Starting time must be at least 1 minute for both players.');
+        return;
+      }
+      if (isNaN(p1Inc) || p1Inc < 0 || isNaN(p2Inc) || p2Inc < 0) {
+        setErrorMessage('Increments cannot be negative.');
+        return;
+      }
+
+      const name = presetName.trim() || `Handicap ${p1Min}m vs ${p2Min}m`;
       config = createHandicapConfig(
         name,
-        p1Base,
+        p1Min * 60,
         p1Inc,
         p1Method,
-        p2Base,
+        p2Min * 60,
         p2Inc,
         p2Method
       );
     } else {
       // Multi-stage
-      const s1Moves = parseInt(stage1Moves, 10) || 40;
-      const s1Min = parseInt(stage1Minutes, 10) || 90;
-      const s1Inc = parseInt(stage1Inc, 10) || 30;
+      const s1Moves = parseInt(stage1Moves, 10);
+      const s1Min = parseInt(stage1Minutes, 10);
+      const s1Inc = parseInt(stage1Inc, 10);
+      const s2Min = parseInt(stage2Minutes, 10);
+      const s2Inc = parseInt(stage2Inc, 10);
 
-      const s2Min = parseInt(stage2Minutes, 10) || 30;
-      const s2Inc = parseInt(stage2Inc, 10) || 30;
+      if (isNaN(s1Moves) || s1Moves < 1) {
+        setErrorMessage('Stage 1 move threshold must be at least 1 move.');
+        return;
+      }
+      if (isNaN(s1Min) || s1Min < 1 || isNaN(s2Min) || s2Min < 1) {
+        setErrorMessage('Stage minutes must be at least 1 minute.');
+        return;
+      }
+      if (isNaN(s1Inc) || s1Inc < 0 || isNaN(s2Inc) || s2Inc < 0) {
+        setErrorMessage('Stage increments cannot be negative.');
+        return;
+      }
 
-      const name = presetName || `Tournament ${s1Moves}/${s1Min}m + ${s2Min}m`;
-
+      const name = presetName.trim() || `Tournament ${s1Moves}/${s1Min}m + ${s2Min}m`;
       config = createMultiStageConfig(`tournament_${Date.now()}`, name, [
         {
           movesThreshold: s1Moves,
@@ -133,52 +174,112 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContent}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.borderSubtle,
+            },
+          ]}
+        >
+          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Custom Time Control</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Custom Time Control</Text>
+            <Pressable
+              onPress={onClose}
+              style={[styles.closeBtn, { backgroundColor: theme.surfaceElevated }]}
+            >
+              <Text style={[styles.closeBtnText, { color: theme.textSecondary }]}>✕</Text>
             </Pressable>
           </View>
 
           {/* Mode Selector Tabs */}
-          <View style={styles.modeTabs}>
+          <View style={[styles.modeTabs, { backgroundColor: theme.surfaceElevated }]}>
             <Pressable
-              style={[styles.modeTab, mode === 'symmetric' && styles.activeModeTab]}
-              onPress={() => setMode('symmetric')}
+              style={[
+                styles.modeTab,
+                mode === 'symmetric' && { backgroundColor: theme.accentBlue },
+              ]}
+              onPress={() => {
+                setMode('symmetric');
+                setErrorMessage(null);
+              }}
             >
-              <Text style={[styles.modeTabText, mode === 'symmetric' && styles.activeModeTabText]}>
+              <Text
+                style={[
+                  styles.modeTabText,
+                  { color: mode === 'symmetric' ? '#ffffff' : theme.textMuted },
+                ]}
+              >
                 Standard
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.modeTab, mode === 'handicap' && styles.activeModeTab]}
-              onPress={() => setMode('handicap')}
+              style={[
+                styles.modeTab,
+                mode === 'handicap' && { backgroundColor: theme.accentBlue },
+              ]}
+              onPress={() => {
+                setMode('handicap');
+                setErrorMessage(null);
+              }}
             >
-              <Text style={[styles.modeTabText, mode === 'handicap' && styles.activeModeTabText]}>
+              <Text
+                style={[
+                  styles.modeTabText,
+                  { color: mode === 'handicap' ? '#ffffff' : theme.textMuted },
+                ]}
+              >
                 Handicap
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.modeTab, mode === 'multistage' && styles.activeModeTab]}
-              onPress={() => setMode('multistage')}
+              style={[
+                styles.modeTab,
+                mode === 'multistage' && { backgroundColor: theme.accentBlue },
+              ]}
+              onPress={() => {
+                setMode('multistage');
+                setErrorMessage(null);
+              }}
             >
-              <Text style={[styles.modeTabText, mode === 'multistage' && styles.activeModeTabText]}>
+              <Text
+                style={[
+                  styles.modeTabText,
+                  { color: mode === 'multistage' ? '#ffffff' : theme.textMuted },
+                ]}
+              >
                 Multi-Stage
               </Text>
             </Pressable>
           </View>
 
+          {/* Validation Error Banner */}
+          {errorMessage ? (
+            <View style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
+              <Text style={[styles.errorText, { color: theme.flagRed }]}>⚠️ {errorMessage}</Text>
+            </View>
+          ) : null}
+
           <ScrollView style={styles.bodyScroll} showsVerticalScrollIndicator={false}>
-            {/* Preset Name Input */}
+            {/* Preset Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Preset Name</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Preset Name</Text>
               <TextInput
-                style={styles.textInput}
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: theme.surfaceElevated,
+                    color: theme.textPrimary,
+                    borderColor: theme.borderSubtle,
+                  },
+                ]}
                 value={presetName}
                 onChangeText={setPresetName}
                 placeholder="e.g. My Blitz 4|2"
-                placeholderTextColor="#64748b"
+                placeholderTextColor={theme.textMuted}
+                maxLength={24}
               />
             </View>
 
@@ -187,27 +288,48 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <View>
                 <View style={styles.rowInputs}>
                   <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.inputLabel}>Minutes</Text>
+                    <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Minutes</Text>
                     <TextInput
-                      style={styles.textInput}
+                      style={[
+                        styles.textInput,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          color: theme.textPrimary,
+                          borderColor: theme.borderSubtle,
+                        },
+                      ]}
                       keyboardType="number-pad"
                       value={symMinutes}
                       onChangeText={setSymMinutes}
                     />
                   </View>
                   <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.inputLabel}>Seconds</Text>
+                    <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Seconds</Text>
                     <TextInput
-                      style={styles.textInput}
+                      style={[
+                        styles.textInput,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          color: theme.textPrimary,
+                          borderColor: theme.borderSubtle,
+                        },
+                      ]}
                       keyboardType="number-pad"
                       value={symSeconds}
                       onChangeText={setSymSeconds}
                     />
                   </View>
                   <View style={[styles.inputGroup, { flex: 1 }]}>
-                    <Text style={styles.inputLabel}>Increment (s)</Text>
+                    <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Increment (s)</Text>
                     <TextInput
-                      style={styles.textInput}
+                      style={[
+                        styles.textInput,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          color: theme.textPrimary,
+                          borderColor: theme.borderSubtle,
+                        },
+                      ]}
                       keyboardType="number-pad"
                       value={symIncSeconds}
                       onChangeText={setSymIncSeconds}
@@ -215,60 +337,89 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   </View>
                 </View>
 
-                <Text style={styles.sectionHeader}>Timing Mechanic</Text>
-                {timingMethods.map(item => (
-                  <Pressable
-                    key={item.id}
-                    style={[
-                      styles.methodRow,
-                      symMethod === item.id && styles.activeMethodRow,
-                    ]}
-                    onPress={() => setSymMethod(item.id)}
-                  >
-                    <View>
-                      <Text
-                        style={[
-                          styles.methodLabel,
-                          symMethod === item.id && styles.activeMethodLabel,
-                        ]}
-                      >
-                        {item.label}
-                      </Text>
-                      <Text style={styles.methodDesc}>{item.desc}</Text>
-                    </View>
-                    <View
+                <Text style={[styles.sectionHeader, { color: theme.accentGold }]}>TIMING MECHANIC</Text>
+                {timingMethods.map(item => {
+                  const isSelected = symMethod === item.id;
+                  return (
+                    <Pressable
+                      key={item.id}
                       style={[
-                        styles.radioOuter,
-                        symMethod === item.id && styles.radioOuterActive,
+                        styles.methodRow,
+                        {
+                          backgroundColor: isSelected ? theme.surfaceActive : theme.surfaceElevated,
+                          borderColor: isSelected ? theme.borderActive : theme.borderSubtle,
+                        },
                       ]}
+                      onPress={() => setSymMethod(item.id)}
                     >
-                      {symMethod === item.id ? <View style={styles.radioInner} /> : null}
-                    </View>
-                  </Pressable>
-                ))}
+                      <View>
+                        <Text
+                          style={[
+                            styles.methodLabel,
+                            { color: isSelected ? '#ffffff' : theme.textPrimary },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.methodDesc,
+                            { color: isSelected ? theme.activeSubTextColor : theme.textMuted },
+                          ]}
+                        >
+                          {item.desc}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
 
-            {/* HANDICAP ASYMMETRIC FORM */}
+            {/* HANDICAP FORM */}
             {mode === 'handicap' && (
               <View>
                 {/* Player 1 Box */}
-                <View style={styles.handicapBox}>
-                  <Text style={styles.handicapBoxTitle}>⚪ Player 1 (White)</Text>
+                <View
+                  style={[
+                    styles.handicapBox,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.handicapBoxTitle, { color: theme.textPrimary }]}>
+                    ⚪ Player 1 (White)
+                  </Text>
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Minutes</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Minutes</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={p1Minutes}
                         onChangeText={setP1Minutes}
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>Increment (s)</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Increment (s)</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={p1IncSeconds}
                         onChangeText={setP1IncSeconds}
@@ -281,14 +432,19 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         key={m.id}
                         style={[
                           styles.methodChip,
-                          p1Method === m.id && styles.activeMethodChip,
+                          {
+                            backgroundColor:
+                              p1Method === m.id ? theme.accentBlue : theme.surface,
+                            borderColor:
+                              p1Method === m.id ? theme.borderActive : theme.borderSubtle,
+                          },
                         ]}
                         onPress={() => setP1Method(m.id)}
                       >
                         <Text
                           style={[
                             styles.chipText,
-                            p1Method === m.id && styles.activeChipText,
+                            { color: p1Method === m.id ? '#ffffff' : theme.textMuted },
                           ]}
                         >
                           {m.label.split(' ')[0]}
@@ -299,22 +455,46 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 </View>
 
                 {/* Player 2 Box */}
-                <View style={styles.handicapBox}>
-                  <Text style={styles.handicapBoxTitle}>⚫ Player 2 (Black)</Text>
+                <View
+                  style={[
+                    styles.handicapBox,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.handicapBoxTitle, { color: theme.textPrimary }]}>
+                    ⚫ Player 2 (Black)
+                  </Text>
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Minutes</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Minutes</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={p2Minutes}
                         onChangeText={setP2Minutes}
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>Increment (s)</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Increment (s)</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={p2IncSeconds}
                         onChangeText={setP2IncSeconds}
@@ -327,14 +507,19 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         key={m.id}
                         style={[
                           styles.methodChip,
-                          p2Method === m.id && styles.activeMethodChip,
+                          {
+                            backgroundColor:
+                              p2Method === m.id ? theme.accentBlue : theme.surface,
+                            borderColor:
+                              p2Method === m.id ? theme.borderActive : theme.borderSubtle,
+                          },
                         ]}
                         onPress={() => setP2Method(m.id)}
                       >
                         <Text
                           style={[
                             styles.chipText,
-                            p2Method === m.id && styles.activeChipText,
+                            { color: p2Method === m.id ? '#ffffff' : theme.textMuted },
                           ]}
                         >
                           {m.label.split(' ')[0]}
@@ -349,33 +534,62 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             {/* MULTI-STAGE FORM */}
             {mode === 'multistage' && (
               <View>
-                {/* Stage 1 */}
-                <View style={styles.handicapBox}>
-                  <Text style={styles.handicapBoxTitle}>Stage 1 Control</Text>
+                <View
+                  style={[
+                    styles.handicapBox,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.handicapBoxTitle, { color: theme.textPrimary }]}>
+                    Stage 1 Control
+                  </Text>
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Move Threshold</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Move Threshold</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={stage1Moves}
                         onChangeText={setStage1Moves}
-                        placeholder="e.g. 40"
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Minutes</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Minutes</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={stage1Minutes}
                         onChangeText={setStage1Minutes}
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>Inc (s)</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Inc (s)</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={stage1Inc}
                         onChangeText={setStage1Inc}
@@ -384,23 +598,46 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   </View>
                 </View>
 
-                {/* Stage 2 */}
-                <View style={styles.handicapBox}>
-                  <Text style={styles.handicapBoxTitle}>Stage 2 Bonus (Rest of game)</Text>
+                <View
+                  style={[
+                    styles.handicapBox,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.handicapBoxTitle, { color: theme.textPrimary }]}>
+                    Stage 2 Bonus (Rest of game)
+                  </Text>
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Added Minutes</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Added Minutes</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={stage2Minutes}
                         onChangeText={setStage2Minutes}
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>Inc (s)</Text>
+                      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Inc (s)</Text>
                       <TextInput
-                        style={styles.textInput}
+                        style={[
+                          styles.textInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.textPrimary,
+                            borderColor: theme.borderSubtle,
+                          },
+                        ]}
                         keyboardType="number-pad"
                         value={stage2Inc}
                         onChangeText={setStage2Inc}
@@ -411,9 +648,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               </View>
             )}
 
-            {/* Save & Apply Button */}
-            <Pressable style={styles.applyBtn} onPress={handleSaveAndApply}>
-              <Text style={styles.applyBtnText}>Save & Start Clock</Text>
+            {/* Save & Apply */}
+            <Pressable
+              style={[styles.applyBtn, { backgroundColor: theme.surfaceActive }]}
+              onPress={handleSaveAndApply}
+            >
+              <Text style={styles.applyBtnText}>Save & Apply Clock</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -430,12 +670,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalContent: {
-    backgroundColor: '#0f172a',
     borderRadius: 20,
     maxHeight: '90%',
     padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
   },
   header: {
     flexDirection: 'row',
@@ -446,28 +684,25 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#f8fafc',
+    letterSpacing: 0.5,
   },
   closeBtn: {
     padding: 6,
     borderRadius: 16,
-    backgroundColor: '#1e293b',
     width: 32,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    color: '#94a3b8',
     fontSize: 14,
     fontWeight: '800',
   },
   modeTabs: {
     flexDirection: 'row',
-    backgroundColor: '#1e293b',
     borderRadius: 12,
     padding: 4,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modeTab: {
     flex: 1,
@@ -475,16 +710,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  activeModeTab: {
-    backgroundColor: '#2563eb',
-  },
   modeTabText: {
-    color: '#94a3b8',
     fontSize: 12,
     fontWeight: '700',
   },
-  activeModeTabText: {
-    color: '#ffffff',
+  errorBanner: {
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   bodyScroll: {
     marginBottom: 8,
@@ -493,89 +730,51 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inputLabel: {
-    color: '#94a3b8',
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 6,
   },
   textInput: {
-    backgroundColor: '#1e293b',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#ffffff',
-    fontSize: 15,
+    paddingVertical: 9,
+    fontSize: 14,
+    fontWeight: '600',
     borderWidth: 1,
-    borderColor: '#334155',
   },
   rowInputs: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   sectionHeader: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
     marginTop: 10,
     marginBottom: 8,
   },
   methodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  activeMethodRow: {
-    borderColor: '#38bdf8',
-    backgroundColor: '#0c4a6e',
+    borderWidth: 1.5,
   },
   methodLabel: {
-    color: '#f8fafc',
     fontSize: 14,
-    fontWeight: '700',
-  },
-  activeMethodLabel: {
-    color: '#38bdf8',
+    fontWeight: '800',
   },
   methodDesc: {
-    color: '#94a3b8',
     fontSize: 11,
     marginTop: 2,
   },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#64748b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterActive: {
-    borderColor: '#38bdf8',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#38bdf8',
-  },
   handicapBox: {
-    backgroundColor: '#1e293b',
     padding: 14,
     borderRadius: 14,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
   },
   handicapBoxTitle: {
-    color: '#f8fafc',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     marginBottom: 10,
   },
@@ -585,29 +784,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   methodChip: {
-    backgroundColor: '#0f172a',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     marginRight: 6,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#334155',
-  },
-  activeMethodChip: {
-    backgroundColor: '#2563eb',
-    borderColor: '#60a5fa',
   },
   chipText: {
-    color: '#94a3b8',
     fontSize: 12,
     fontWeight: '700',
   },
-  activeChipText: {
-    color: '#ffffff',
-  },
   applyBtn: {
-    backgroundColor: '#16a34a',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -616,7 +804,8 @@ const styles = StyleSheet.create({
   },
   applyBtnText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

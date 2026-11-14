@@ -1,13 +1,16 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, StorageService } from '../services/storageService';
 import { AudioService } from '../services/audioService';
 import { HapticsService } from '../services/hapticsService';
 import { TimeControlConfig } from '../engine/types';
+import { THEMES, ThemeColors } from '../theme/tokens';
 
 interface SettingsContextValue {
   settings: AppSettings;
+  theme: ThemeColors;
   customPresets: TimeControlConfig[];
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+  resetSettings: () => Promise<void>;
   addCustomPreset: (preset: TimeControlConfig) => Promise<void>;
   deleteCustomPreset: (id: string) => Promise<void>;
 }
@@ -32,6 +35,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     init();
   }, []);
 
+  const theme = useMemo(() => {
+    return THEMES[settings.theme] || THEMES.graphite;
+  }, [settings.theme]);
+
   const updateSettings = async (partial: Partial<AppSettings>) => {
     const updated = { ...settings, ...partial };
     setSettings(updated);
@@ -44,6 +51,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     await StorageService.saveSettings(updated);
+  };
+
+  const resetSettings = async () => {
+    const defaults = await StorageService.resetSettings();
+    setSettings(defaults);
+    AudioService.setSoundEnabled(defaults.soundEnabled);
+    HapticsService.setHapticsEnabled(defaults.hapticsEnabled);
   };
 
   const addCustomPreset = async (preset: TimeControlConfig) => {
@@ -62,8 +76,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <SettingsContext.Provider
       value={{
         settings,
+        theme,
         customPresets,
         updateSettings,
+        resetSettings,
         addCustomPreset,
         deleteCustomPreset,
       }}

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { ClockSnapshot, PlayerId } from '../engine/types';
 import { formatTimeDisplay } from '../state/useChessClock';
+import { useSettings } from '../state/SettingsContext';
 
 interface TimeAdjustModalProps {
   visible: boolean;
@@ -24,9 +25,11 @@ export const TimeAdjustModal: React.FC<TimeAdjustModalProps> = ({
   onAdjustTime,
   onAdjustMoves,
 }) => {
+  const { theme, settings } = useSettings();
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerId>(1);
 
   const playerState = selectedPlayer === 1 ? snapshot.player1 : snapshot.player2;
+  const pName = selectedPlayer === 1 ? settings.player1Name : settings.player2Name;
 
   const timeButtons = [
     { label: '+5 min', deltaMs: 5 * 60 * 1000 },
@@ -44,97 +47,130 @@ export const TimeAdjustModal: React.FC<TimeAdjustModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.title}>On-the-Fly Time & Move Adjustment</Text>
-          <Text style={styles.subtitle}>
-            Adjust clock times or move counts to fix mid-game mistakes or penalties.
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.borderSubtle,
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            On-the-Fly Adjustments
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+            Arbitration tool: adjust time or move count mid-game.
           </Text>
 
           {/* Player Selector Tabs */}
-          <View style={styles.tabContainer}>
+          <View style={[styles.tabContainer, { backgroundColor: theme.surfaceElevated }]}>
             <Pressable
-              style={[styles.tab, selectedPlayer === 1 && styles.activeTab]}
+              style={[
+                styles.tab,
+                selectedPlayer === 1 && { backgroundColor: theme.accentBlue },
+              ]}
               onPress={() => setSelectedPlayer(1)}
             >
               <Text
                 style={[
                   styles.tabText,
-                  selectedPlayer === 1 && styles.activeTabText,
+                  { color: selectedPlayer === 1 ? '#ffffff' : theme.textMuted },
                 ]}
               >
-                White (P1): {formatTimeDisplay(snapshot.player1.timeRemainingMs)}
+                {settings.player1Name}: {formatTimeDisplay(snapshot.player1.timeRemainingMs)}
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.tab, selectedPlayer === 2 && styles.activeTab]}
+              style={[
+                styles.tab,
+                selectedPlayer === 2 && { backgroundColor: theme.accentBlue },
+              ]}
               onPress={() => setSelectedPlayer(2)}
             >
               <Text
                 style={[
                   styles.tabText,
-                  selectedPlayer === 2 && styles.activeTabText,
+                  { color: selectedPlayer === 2 ? '#ffffff' : theme.textMuted },
                 ]}
               >
-                Black (P2): {formatTimeDisplay(snapshot.player2.timeRemainingMs)}
+                {settings.player2Name}: {formatTimeDisplay(snapshot.player2.timeRemainingMs)}
               </Text>
             </Pressable>
           </View>
 
           {/* Current Values Display */}
-          <View style={styles.statsCard}>
+          <View style={[styles.statsCard, { backgroundColor: theme.surfaceElevated }]}>
             <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Current Time:</Text>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                {pName}'s Time:
+              </Text>
+              <Text style={[styles.statValue, { color: theme.accentBlue }]}>
                 {formatTimeDisplay(playerState.timeRemainingMs)}
               </Text>
             </View>
             <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Move Count:</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                Move Count:
+              </Text>
               <View style={styles.moveStepper}>
                 <Pressable
-                  style={styles.stepBtn}
+                  style={[styles.stepBtn, { backgroundColor: theme.surface }]}
                   onPress={() => onAdjustMoves(selectedPlayer, -1)}
                 >
-                  <Text style={styles.stepBtnText}>-</Text>
+                  <Text style={[styles.stepBtnText, { color: theme.textPrimary }]}>-</Text>
                 </Pressable>
-                <Text style={styles.moveValue}>{playerState.moveCount}</Text>
+                <Text style={[styles.moveValue, { color: theme.textPrimary }]}>
+                  {playerState.moveCount}
+                </Text>
                 <Pressable
-                  style={styles.stepBtn}
+                  style={[styles.stepBtn, { backgroundColor: theme.surface }]}
                   onPress={() => onAdjustMoves(selectedPlayer, 1)}
                 >
-                  <Text style={styles.stepBtnText}>+</Text>
+                  <Text style={[styles.stepBtnText, { color: theme.textPrimary }]}>+</Text>
                 </Pressable>
               </View>
             </View>
           </View>
 
-          {/* Time Adjustment Buttons Grid */}
-          <Text style={styles.sectionHeader}>Adjust Clock Time</Text>
+          {/* Adjustment Buttons Grid */}
+          <Text style={[styles.sectionHeader, { color: theme.accentGold }]}>
+            ADJUST TIME
+          </Text>
           <View style={styles.buttonGrid}>
-            {timeButtons.map((btn, index) => (
-              <Pressable
-                key={index}
-                style={[
-                  styles.adjustBtn,
-                  btn.deltaMs < 0 ? styles.minusBtn : styles.plusBtn,
-                ]}
-                onPress={() => onAdjustTime(selectedPlayer, btn.deltaMs)}
-              >
-                <Text
+            {timeButtons.map((btn, index) => {
+              const isMinus = btn.deltaMs < 0;
+              return (
+                <Pressable
+                  key={index}
                   style={[
-                    styles.adjustBtnText,
-                    btn.deltaMs < 0 ? styles.minusText : styles.plusText,
+                    styles.adjustBtn,
+                    {
+                      backgroundColor: isMinus ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                      borderColor: isMinus ? theme.flagRed : theme.borderActive,
+                    },
                   ]}
+                  onPress={() => onAdjustTime(selectedPlayer, btn.deltaMs)}
                 >
-                  {btn.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.adjustBtnText,
+                      { color: isMinus ? '#fca5a5' : '#86efac' },
+                    ]}
+                  >
+                    {btn.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {/* Done / Close Button */}
-          <Pressable style={styles.doneButton} onPress={onClose}>
+          {/* Done Button */}
+          <Pressable
+            style={[styles.doneButton, { backgroundColor: theme.accentBlue }]}
+            onPress={onClose}
+          >
             <Text style={styles.doneButtonText}>Done</Text>
           </Pressable>
         </View>
@@ -146,36 +182,32 @@ export const TimeAdjustModal: React.FC<TimeAdjustModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   modalContent: {
-    backgroundColor: '#0f172a',
     borderRadius: 20,
     width: '100%',
-    maxWidth: 420,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    maxWidth: 440,
+    padding: 22,
+    borderWidth: 1.5,
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#f8fafc',
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 12,
-    color: '#94a3b8',
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 16,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#1e293b',
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -186,19 +218,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  activeTab: {
-    backgroundColor: '#2563eb',
-  },
   tabText: {
-    color: '#94a3b8',
     fontWeight: '700',
-    fontSize: 13,
-  },
-  activeTabText: {
-    color: '#ffffff',
+    fontSize: 12,
   },
   statsCard: {
-    backgroundColor: '#1e293b',
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
@@ -210,12 +234,10 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   statLabel: {
-    color: '#cbd5e1',
     fontSize: 14,
     fontWeight: '600',
   },
   statValue: {
-    color: '#38bdf8',
     fontSize: 20,
     fontWeight: '800',
     fontFamily: 'monospace',
@@ -225,7 +247,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stepBtn: {
-    backgroundColor: '#334155',
     width: 32,
     height: 32,
     borderRadius: 6,
@@ -233,22 +254,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepBtnText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: '800',
   },
   moveValue: {
-    color: '#f8fafc',
     fontSize: 16,
     fontWeight: '800',
     marginHorizontal: 12,
   },
   sectionHeader: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
     marginBottom: 8,
-    textTransform: 'uppercase',
   },
   buttonGrid: {
     flexDirection: 'row',
@@ -262,29 +280,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginVertical: 4,
-  },
-  plusBtn: {
-    backgroundColor: '#14532d',
     borderWidth: 1,
-    borderColor: '#22c55e',
-  },
-  minusBtn: {
-    backgroundColor: '#7f1d1d',
-    borderWidth: 1,
-    borderColor: '#ef4444',
   },
   adjustBtnText: {
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
-  plusText: {
-    color: '#86efac',
-  },
-  minusText: {
-    color: '#fca5a5',
-  },
   doneButton: {
-    backgroundColor: '#2563eb',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',

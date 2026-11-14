@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSettings } from '../state/SettingsContext';
+import { THEMES, ThemeId } from '../theme/tokens';
+import { BackgroundBehavior, ClockOrientation } from '../services/storageService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -15,80 +19,318 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
-  const { settings, updateSettings } = useSettings();
+  const { settings, theme, updateSettings, resetSettings } = useSettings();
+
+  const [p1Name, setP1Name] = useState(settings.player1Name);
+  const [p2Name, setP2Name] = useState(settings.player2Name);
+
+  useEffect(() => {
+    setP1Name(settings.player1Name);
+    setP2Name(settings.player2Name);
+  }, [settings.player1Name, settings.player2Name]);
+
+  const handleSaveNames = () => {
+    updateSettings({
+      player1Name: p1Name.trim() || 'White',
+      player2Name: p2Name.trim() || 'Black',
+    });
+  };
+
+  const themeList: { id: ThemeId; name: string; color: string }[] = [
+    { id: 'graphite', name: 'Graphite', color: THEMES.graphite.surfaceActive },
+    { id: 'midnight', name: 'Midnight', color: THEMES.midnight.surfaceActive },
+    { id: 'emerald', name: 'Emerald', color: THEMES.emerald.surfaceActive },
+    { id: 'wood', name: 'Classic Wood', color: THEMES.wood.surfaceActive },
+  ];
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContent}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.borderSubtle,
+            },
+          ]}
+        >
+          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Clock Settings</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Clock Settings</Text>
+            <Pressable
+              onPress={() => {
+                handleSaveNames();
+                onClose();
+              }}
+              style={[styles.closeBtn, { backgroundColor: theme.surfaceElevated }]}
+            >
+              <Text style={[styles.closeBtnText, { color: theme.textSecondary }]}>✕</Text>
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            {/* Sound Toggle */}
-            <View style={styles.settingRow}>
+          <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
+            {/* Player Names Section */}
+            <Text style={[styles.sectionHeader, { color: theme.accentGold }]}>PLAYER NAMES</Text>
+            <View style={styles.nameRow}>
+              <View style={[styles.nameInputContainer, { flex: 1, marginRight: 8 }]}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Player 1 (White)</Text>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      color: theme.textPrimary,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                  value={p1Name}
+                  onChangeText={setP1Name}
+                  onBlur={handleSaveNames}
+                  placeholder="White"
+                  placeholderTextColor={theme.textMuted}
+                  maxLength={16}
+                />
+              </View>
+              <View style={[styles.nameInputContainer, { flex: 1 }]}>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Player 2 (Black)</Text>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      color: theme.textPrimary,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                  value={p2Name}
+                  onChangeText={setP2Name}
+                  onBlur={handleSaveNames}
+                  placeholder="Black"
+                  placeholderTextColor={theme.textMuted}
+                  maxLength={16}
+                />
+              </View>
+            </View>
+
+            {/* Theme Selection */}
+            <Text style={[styles.sectionHeader, { color: theme.accentGold, marginTop: 18 }]}>THEME</Text>
+            <View style={styles.themeRow}>
+              {themeList.map(item => {
+                const isSelected = settings.theme === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={[
+                      styles.themeCard,
+                      {
+                        backgroundColor: theme.surfaceElevated,
+                        borderColor: isSelected ? theme.accentBlue : theme.borderSubtle,
+                      },
+                    ]}
+                    onPress={() => updateSettings({ theme: item.id })}
+                  >
+                    <View style={[styles.themeColorDot, { backgroundColor: item.color }]} />
+                    <Text
+                      style={[
+                        styles.themeName,
+                        { color: isSelected ? theme.textPrimary : theme.textMuted },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Clock Orientation Option */}
+            <Text style={[styles.sectionHeader, { color: theme.accentGold, marginTop: 18 }]}>
+              TOP CLOCK ORIENTATION
+            </Text>
+            <View style={styles.orientationTabs}>
+              <Pressable
+                style={[
+                  styles.tabButton,
+                  settings.clockOrientation === 'opposite' && {
+                    backgroundColor: theme.accentBlue,
+                  },
+                ]}
+                onPress={() => updateSettings({ clockOrientation: 'opposite' as ClockOrientation })}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    {
+                      color:
+                        settings.clockOrientation === 'opposite'
+                          ? '#ffffff'
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  Opponent Facing (180°)
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tabButton,
+                  settings.clockOrientation === 'same' && {
+                    backgroundColor: theme.accentBlue,
+                  },
+                ]}
+                onPress={() => updateSettings({ clockOrientation: 'same' as ClockOrientation })}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    {
+                      color:
+                        settings.clockOrientation === 'same'
+                          ? '#ffffff'
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  Normal (Observer)
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Background Behavior */}
+            <Text style={[styles.sectionHeader, { color: theme.accentGold, marginTop: 18 }]}>
+              BACKGROUND BEHAVIOR
+            </Text>
+            <View style={styles.orientationTabs}>
+              <Pressable
+                style={[
+                  styles.tabButton,
+                  settings.backgroundBehavior === 'pause' && {
+                    backgroundColor: theme.accentBlue,
+                  },
+                ]}
+                onPress={() => updateSettings({ backgroundBehavior: 'pause' as BackgroundBehavior })}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    {
+                      color:
+                        settings.backgroundBehavior === 'pause'
+                          ? '#ffffff'
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  Auto-Pause on Minimize
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tabButton,
+                  settings.backgroundBehavior === 'continue' && {
+                    backgroundColor: theme.accentBlue,
+                  },
+                ]}
+                onPress={() => updateSettings({ backgroundBehavior: 'continue' as BackgroundBehavior })}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    {
+                      color:
+                        settings.backgroundBehavior === 'continue'
+                          ? '#ffffff'
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  Continue Running
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Audio & Haptic Toggles */}
+            <Text style={[styles.sectionHeader, { color: theme.accentGold, marginTop: 18 }]}>
+              AUDIO & FEEDBACK
+            </Text>
+
+            <View style={[styles.settingRow, { borderColor: theme.borderSubtle }]}>
               <View style={styles.textContainer}>
-                <Text style={styles.settingLabel}>Sound Effects</Text>
-                <Text style={styles.settingSub}>
-                  Mechanical click on button taps and alarm on 0:00 flag
+                <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Sound Effects</Text>
+                <Text style={[styles.settingSub, { color: theme.textMuted }]}>
+                  Mechanical clock press clicks
                 </Text>
               </View>
               <Switch
                 value={settings.soundEnabled}
                 onValueChange={val => updateSettings({ soundEnabled: val })}
-                trackColor={{ false: '#334155', true: '#2563eb' }}
-                thumbColor={settings.soundEnabled ? '#60a5fa' : '#94a3b8'}
+                trackColor={{ false: theme.borderSubtle, true: theme.accentBlue }}
               />
             </View>
 
-            {/* Haptic Feedback Toggle */}
-            <View style={styles.settingRow}>
+            <View style={[styles.settingRow, { borderColor: theme.borderSubtle }]}>
               <View style={styles.textContainer}>
-                <Text style={styles.settingLabel}>Haptic Feedback</Text>
-                <Text style={styles.settingSub}>
-                  Tactile vibration on every turn pass and flag
+                <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Haptic Feedback</Text>
+                <Text style={[styles.settingSub, { color: theme.textMuted }]}>
+                  Tactile vibration on every turn pass
                 </Text>
               </View>
               <Switch
                 value={settings.hapticsEnabled}
                 onValueChange={val => updateSettings({ hapticsEnabled: val })}
-                trackColor={{ false: '#334155', true: '#2563eb' }}
-                thumbColor={settings.hapticsEnabled ? '#60a5fa' : '#94a3b8'}
+                trackColor={{ false: theme.borderSubtle, true: theme.accentBlue }}
               />
             </View>
 
-            {/* Auto-Pause Toggle */}
-            <View style={styles.settingRow}>
+            <View style={[styles.settingRow, { borderColor: theme.borderSubtle }]}>
               <View style={styles.textContainer}>
-                <Text style={styles.settingLabel}>Auto-Pause on Background</Text>
-                <Text style={styles.settingSub}>
-                  Automatically pauses clock during phone calls or screen lock
+                <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Low-Time Warning</Text>
+                <Text style={[styles.settingSub, { color: theme.textMuted }]}>
+                  Subtle audio ticks when under 10 seconds
                 </Text>
               </View>
               <Switch
-                value={settings.autoPauseEnabled}
-                onValueChange={val => updateSettings({ autoPauseEnabled: val })}
-                trackColor={{ false: '#334155', true: '#2563eb' }}
-                thumbColor={settings.autoPauseEnabled ? '#60a5fa' : '#94a3b8'}
+                value={settings.lowTimeWarning}
+                onValueChange={val => updateSettings({ lowTimeWarning: val })}
+                trackColor={{ false: theme.borderSubtle, true: theme.accentBlue }}
               />
             </View>
 
-            {/* Offline & Architecture Badge */}
-            <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>100% Offline & Precision Tuned</Text>
-              <Text style={styles.infoDesc}>
-                This chess clock calculates delta timestamps against native hardware clocks
-                with zero drift. All presets and preferences are persisted locally on-device.
-              </Text>
+            <View style={[styles.settingRow, { borderColor: theme.borderSubtle }]}>
+              <View style={styles.textContainer}>
+                <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Timeout Alarm</Text>
+                <Text style={[styles.settingSub, { color: theme.textMuted }]}>
+                  Two-tone buzzer alarm when time reaches 0:00
+                </Text>
+              </View>
+              <Switch
+                value={settings.timeoutAlarm}
+                onValueChange={val => updateSettings({ timeoutAlarm: val })}
+                trackColor={{ false: theme.borderSubtle, true: theme.accentBlue }}
+              />
             </View>
-          </View>
 
-          <Pressable style={styles.doneBtn} onPress={onClose}>
-            <Text style={styles.doneBtnText}>Close</Text>
+            {/* Restore Defaults Button */}
+            <Pressable
+              style={[styles.resetDefaultsBtn, { borderColor: theme.borderSubtle }]}
+              onPress={resetSettings}
+            >
+              <Text style={[styles.resetDefaultsText, { color: theme.textSecondary }]}>
+                Restore Default Settings
+              </Text>
+            </Pressable>
+          </ScrollView>
+
+          {/* Close Button */}
+          <Pressable
+            style={[styles.doneBtn, { backgroundColor: theme.accentBlue }]}
+            onPress={() => {
+              handleSaveNames();
+              onClose();
+            }}
+          >
+            <Text style={styles.doneBtnText}>Done</Text>
           </Pressable>
         </View>
       </View>
@@ -101,86 +343,140 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   modalContent: {
-    backgroundColor: '#0f172a',
     borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '90%',
+    padding: 22,
+    borderWidth: 1.5,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#f8fafc',
+    letterSpacing: 0.5,
   },
   closeBtn: {
     padding: 6,
     borderRadius: 16,
-    backgroundColor: '#1e293b',
     width: 32,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    color: '#94a3b8',
     fontSize: 14,
     fontWeight: '800',
   },
-  section: {
-    marginBottom: 20,
+  scrollBody: {
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  nameRow: {
+    flexDirection: 'row',
+  },
+  nameInputContainer: {
+    marginBottom: 4,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  textInput: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    fontWeight: '600',
+    borderWidth: 1,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  themeCard: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1.5,
+  },
+  themeColorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 8,
+  },
+  themeName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  orientationTabs: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  tabButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
   },
   textContainer: {
     flex: 1,
     marginRight: 16,
   },
   settingLabel: {
-    color: '#f8fafc',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   settingSub: {
-    color: '#94a3b8',
     fontSize: 12,
     marginTop: 2,
   },
-  infoBox: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#38bdf8',
+  resetDefaultsBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    marginTop: 18,
+    marginBottom: 8,
   },
-  infoTitle: {
-    color: '#38bdf8',
+  resetDefaultsText: {
     fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  infoDesc: {
-    color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 18,
+    fontWeight: '700',
   },
   doneBtn: {
-    backgroundColor: '#2563eb',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
