@@ -1,5 +1,9 @@
 # Chess Clock Pro ⏱️♟️
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://blazingspy15.github.io/Chess-Clock-App/)
+
+**Live URL**: [https://blazingspy15.github.io/Chess-Clock-App/](https://blazingspy15.github.io/Chess-Clock-App/)
+
 A tournament-grade, 100% offline, millisecond-accurate Chess Clock application built with **React Native**, **Expo**, and **TypeScript**, matching the quality and reliability of the official Chess.com app.
 
 ---
