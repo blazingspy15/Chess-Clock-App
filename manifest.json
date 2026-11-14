@@ -1,0 +1,21 @@
+{
+  "short_name": "Chess Clock",
+  "name": "Chess Clock Pro",
+  "icons": [
+    {
+      "src": "/Chess-Clock-App/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/Chess-Clock-App/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/Chess-Clock-App/",
+  "background_color": "#0c0e12",
+  "theme_color": "#0c0e12",
+  "display": "standalone",
+  "orientation": "any"
+}
