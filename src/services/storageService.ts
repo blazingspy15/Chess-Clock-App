@@ -15,6 +15,8 @@ export type BackgroundBehavior = 'pause' | 'continue';
 
 export interface AppSettings {
   soundEnabled: boolean;
+  masterVolume: number; // 0.0 to 1.0 (default 1.0)
+  buttonSoundEnabled: boolean; // Subtle feedback on control buttons
   hapticsEnabled: boolean;
   theme: ThemeId;
   clockOrientation: ClockOrientation;
@@ -27,6 +29,8 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   soundEnabled: true,
+  masterVolume: 1.0,
+  buttonSoundEnabled: true,
   hapticsEnabled: true,
   theme: 'graphite',
   clockOrientation: 'opposite', // Top player rotated 180° for opponent across the table

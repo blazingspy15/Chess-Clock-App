@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, StorageService } from '../services/storageService';
-import { AudioService } from '../services/audioService';
+import { AudioService, AudioStatus } from '../services/audioService';
 import { HapticsService } from '../services/hapticsService';
 import { TimeControlConfig } from '../engine/types';
 import { THEMES, ThemeColors } from '../theme/tokens';
@@ -8,6 +8,7 @@ import { THEMES, ThemeColors } from '../theme/tokens';
 interface SettingsContextValue {
   settings: AppSettings;
   theme: ThemeColors;
+  audioStatus: AudioStatus;
   customPresets: TimeControlConfig[];
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
   resetSettings: () => Promise<void>;
@@ -19,20 +20,37 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>(() => AudioService.getStatus());
   const [customPresets, setCustomPresets] = useState<TimeControlConfig[]>([]);
 
   useEffect(() => {
-    // Load initial settings and presets from offline storage
+    // Subscribe to AudioService status changes
+    const unsubAudioStatus = AudioService.onStatusChange((status) => {
+      setAudioStatus(status);
+    });
+
+    // Initialize AudioService & load initial settings
     async function init() {
       const savedSettings = await StorageService.loadSettings();
       setSettings(savedSettings);
+
       AudioService.setSoundEnabled(savedSettings.soundEnabled);
+      AudioService.setMasterVolume(savedSettings.masterVolume ?? 1.0);
+      AudioService.setButtonSoundEnabled(savedSettings.buttonSoundEnabled ?? true);
       HapticsService.setHapticsEnabled(savedSettings.hapticsEnabled);
+
+      // Preload native audio assets
+      await AudioService.init();
 
       const savedCustomPresets = await StorageService.loadCustomPresets();
       setCustomPresets(savedCustomPresets);
     }
+
     init();
+
+    return () => {
+      unsubAudioStatus();
+    };
   }, []);
 
   const theme = useMemo(() => {
@@ -46,6 +64,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (partial.soundEnabled !== undefined) {
       AudioService.setSoundEnabled(partial.soundEnabled);
     }
+    if (partial.masterVolume !== undefined) {
+      AudioService.setMasterVolume(partial.masterVolume);
+    }
+    if (partial.buttonSoundEnabled !== undefined) {
+      AudioService.setButtonSoundEnabled(partial.buttonSoundEnabled);
+    }
     if (partial.hapticsEnabled !== undefined) {
       HapticsService.setHapticsEnabled(partial.hapticsEnabled);
     }
@@ -57,6 +81,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const defaults = await StorageService.resetSettings();
     setSettings(defaults);
     AudioService.setSoundEnabled(defaults.soundEnabled);
+    AudioService.setMasterVolume(defaults.masterVolume);
+    AudioService.setButtonSoundEnabled(defaults.buttonSoundEnabled);
     HapticsService.setHapticsEnabled(defaults.hapticsEnabled);
   };
 
@@ -77,6 +103,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         settings,
         theme,
+        audioStatus,
         customPresets,
         updateSettings,
         resetSettings,

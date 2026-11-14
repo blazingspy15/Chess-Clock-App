@@ -1,10 +1,11 @@
 # Chess Clock Pro ⏱️♟️
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://blazingspy15.github.io/Chess-Clock-App/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-15%2F15%20Passing-success?style=for-the-badge)](https://github.com/blazingspy15/Chess-Clock-App)
+[![Tests](https://img.shields.io/badge/Automated%20Tests-20%2F20%20Passing-success?style=for-the-badge)](https://github.com/blazingspy15/Chess-Clock-App)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Typecheck%20Clean-blue?style=for-the-badge&logo=typescript)](https://github.com/blazingspy15/Chess-Clock-App)
 
 **Live Website**: [https://blazingspy15.github.io/Chess-Clock-App/](https://blazingspy15.github.io/Chess-Clock-App/)
+**Latest Android APK**: [Download ChessClockPro-v1.0.2.apk](https://github.com/blazingspy15/Chess-Clock-App/releases/download/v1.0.2/ChessClockPro-v1.0.2.apk)
 
 A tournament-grade, 100% offline, millisecond-accurate Chess Clock application built with **React Native**, **Expo**, and **TypeScript**, matching the quality and reliability of the official Chess.com app.
 
@@ -41,7 +42,13 @@ A tournament-grade, 100% offline, millisecond-accurate Chess Clock application b
 - **Dead-Zone Control Strip**: Narrow central strip with Pause/Resume, Reset, Settings, and Edit buttons placed between clocks to prevent accidental taps.
 - **Responsive Tournament Layout**: Beautifully balanced across desktop monitors, tablets, and phones in both portrait and landscape orientations.
 - **On-the-Fly Adjustments**: Pause anytime to add/subtract minutes, seconds, or moves for either player.
-- **Audio & Haptics**: Low-latency mechanical click sound, flag alarm horn, subtle 10s low-time warning tick, and tactile vibration feedback.
+- **Audio & Haptics Engine**:
+  - **Native Android & iOS Audio via Expo AV (`Audio.Sound`)**: High-performance preloaded and cached sound assets (`assets/sounds/clock-click.wav`, `assets/sounds/low-time.wav`, and `assets/sounds/timeout-alarm.wav`). Configured with `InterruptionModeAndroid.DuckOthers` routing to the media audio stream.
+  - **Web Audio API Hybrid Fallback**: Instant synthesized sounds for desktop and mobile browser previews with zero network latency.
+  - **Master Volume & Audition Controls**: Full 0–100% volume control and dedicated `[▶ Test]` audition buttons in settings.
+  - **Live Audio Status**: Visual indicator in settings (`● Audio Ready`, `◌ Audio Loading...`, `○ Audio Unavailable`).
+  - **Subtle Button Audio**: Optional click feedback on control strip buttons (Pause, Resume, Reset, Adjust).
+  - **Tactile Vibration**: Independent haptic engine that remains functional even when sound is muted.
 
 ---
 
@@ -82,13 +89,20 @@ chess-clock/
 
 ---
 
-## 🧪 Testing the Timing Engine Standalone
+## 🧪 Automated Test Suite (20 Suites)
 
 ```bash
+# Run all 20 test suites (Engine + Audio/Settings)
+npm test
+
+# Run timing engine tests standalone
 npm run test:engine
+
+# Run audio assets & settings tests
+npm run test:audio
 ```
 
-**15 Automated Test Suites**:
+**15 Engine Tests**:
 1. Fischer Increment (3 min + 2s increment)
 2. Bronstein Delay (Cap at turn start time)
 3. Simple Delay (Delay countdown protects main bank)
@@ -104,6 +118,13 @@ npm run test:engine
 13. Strict Non-Negative Clamping (Clock never dips below 0.0s)
 14. Reset and Restart Determinism (Restores configured baseline)
 15. Preset Library Completeness (Bullet, Blitz, Rapid, Classical, Delays)
+
+**5 Audio & Settings Tests**:
+16. Sound Assets Header & WAV Format Verification (16-bit 44.1kHz PCM)
+17. Master Volume Clamping Math (Strict 0.0 to 1.0 clamping)
+18. Rapid-Fire Audio Click Debounce (< 45ms jitter rejection)
+19. Low-Time Warning Trigger Frequency (Strictly once per second when <= 10s)
+20. Inactive Player Tap Rejection Guards Audio (No spurious sound on illegal tap)
 
 ---
 
@@ -135,17 +156,18 @@ npx expo start
 ### Package Details
 - **App Name**: Chess Clock Pro
 - **Package ID**: `com.chessclock.pro`
-- **Version**: `1.0.1` (VersionCode `2`)
-- **Prebuilt APK**: `ChessClockPro-v1.0.1.apk` (or `android/app/build/outputs/apk/release/app-release.apk`)
+- **Version**: `1.0.2` (VersionCode `3`)
+- **Prebuilt APK**: `ChessClockPro-v1.0.2.apk` (or `android/app/build/outputs/apk/release/app-release.apk`)
 
 ### Mobile Enhancements
-1. **Screen Wake-Lock (`expo-keep-awake`)**: Active match prevents device sleep or display timeout; automatically released upon pause/reset to preserve battery.
-2. **Android Hardware Back Guard (`BackHandler`)**: Closes any open modal dialogs first; if a clock is actively ticking, prompts for exit confirmation so matches are never accidentally interrupted.
-3. **Adaptive Status Bar & Immersive Fullscreen**: Dark theme status bar in portrait mode; immersive fullscreen edge-to-edge layout in landscape orientation for maximum touch targets during time scrambles.
-4. **App Icons & Adaptive Assets**: Clean emerald/graphite chess knight icon in 1024x1024, adaptive vector launcher XMLs, and splash screens.
+1. **Native Audio Engine**: Expo AV `Audio.Sound` with preloaded assets and media stream routing.
+2. **Screen Wake-Lock (`expo-keep-awake`)**: Active match prevents device sleep or display timeout; automatically released upon pause/reset to preserve battery.
+3. **Android Hardware Back Guard (`BackHandler`)**: Closes any open modal dialogs first; if a clock is actively ticking, prompts for exit confirmation so matches are never accidentally interrupted.
+4. **Adaptive Status Bar & Immersive Fullscreen**: Dark theme status bar in portrait mode; immersive fullscreen edge-to-edge layout in landscape orientation for maximum touch targets during time scrambles.
+5. **App Icons & Adaptive Assets**: Clean emerald/graphite chess knight icon in 1024x1024, adaptive vector launcher XMLs, and splash screens.
 
 ### How to Install the APK on Android
-1. Transfer `ChessClockPro-v1.0.1.apk` to your Android device via USB, Google Drive, or local file sharing.
+1. Transfer `ChessClockPro-v1.0.2.apk` to your Android device via USB, Google Drive, or local file sharing.
 2. Open the file on your device and tap **Install**.
 3. If prompted with *"Install unknown apps"*, enable permission for your browser or file manager to complete installation.
 

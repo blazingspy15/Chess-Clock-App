@@ -186,6 +186,7 @@ export function useChessClock(initialConfig: TimeControlConfig = DEFAULT_TIME_CO
 
   const togglePause = useCallback(() => {
     HapticsService.triggerButtonPress();
+    AudioService.playButtonSound();
     const snap = engine.getSnapshot();
     if (snap.status === 'running') {
       engine.pause();
@@ -198,12 +199,14 @@ export function useChessClock(initialConfig: TimeControlConfig = DEFAULT_TIME_CO
 
   const reset = useCallback(() => {
     HapticsService.triggerButtonPress();
+    AudioService.playButtonSound();
     engine.reset();
   }, [engine]);
 
   const setPreset = useCallback(
     (config: TimeControlConfig) => {
       HapticsService.triggerButtonPress();
+      AudioService.playButtonSound();
       engine.setConfig(config);
     },
     [engine]
@@ -211,6 +214,7 @@ export function useChessClock(initialConfig: TimeControlConfig = DEFAULT_TIME_CO
 
   const adjustTime = useCallback(
     (player: PlayerId, deltaMs: number) => {
+      AudioService.playButtonSound();
       engine.adjustTime(player, deltaMs);
     },
     [engine]
@@ -218,6 +222,7 @@ export function useChessClock(initialConfig: TimeControlConfig = DEFAULT_TIME_CO
 
   const adjustMoves = useCallback(
     (player: PlayerId, deltaMoves: number) => {
+      AudioService.playButtonSound();
       engine.adjustMoves(player, deltaMoves);
     },
     [engine]
