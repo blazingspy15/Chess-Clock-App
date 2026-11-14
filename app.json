@@ -30,6 +30,9 @@
           "initialOrientation": "DEFAULT"
         }
       ]
-    ]
+    ],
+    "experiments": {
+      "baseUrl": "/Chess-Clock-App"
+    }
   }
 }
