@@ -92,7 +92,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
                   Chess Clock Pro
                 </Text>
                 <Text style={[styles.brandSubtitle, { color: theme.accentBlue }]}>
-                  Tournament Edition • v1.0.2
+                  Tournament Edition • v1.1.0
                 </Text>
                 <Text style={[styles.brandDesc, { color: theme.textMuted }]}>
                   Official high-performance precision clock

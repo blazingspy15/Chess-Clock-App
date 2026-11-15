@@ -1,372 +1,293 @@
-// High-performance, low-latency audio service
-// Supports Native Android/iOS via Expo AV (Audio.Sound) with preloaded cached sound assets
-// and Web Audio API fallback for web preview
+// Chess Clock Pro – Native-first Audio Service v1.1.0
+//
+// ARCHITECTURE:
+//   Android/iOS  → expo-av  Audio.Sound, loaded from base64 data URIs
+//                  (bypasses Metro asset path hashing & res/raw name resolution completely)
+//   Web          → Zero-latency Web Audio API synthesizer (no file download needed)
+//
+// WHY BASE64 DATA URIs?
+//   • Expo release APKs bundle assets into res/raw with mangled names.
+//   • `require('../../assets/sounds/file.wav')` resolves to a numeric module id.
+//   • expo-asset.downloadAsync() can silently fail when the mangled res/raw name
+//     does not match what ResourceAsset.kt expects (space in folder path, etc.).
+//   • { uri: 'data:audio/wav;base64,...' } bypasses ALL of that:
+//     ExoPlayer's DataDataSource handles data URIs natively, offline, zero-network.
 
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { Platform } from 'react-native';
+import { SOUND_DATA_URIS } from './soundData';
 
 export type AudioStatus = 'loading' | 'ready' | 'unavailable';
 
-const SOUND_ASSETS: Record<string, any> = {
-  click: require('../../assets/sounds/clock-click.wav'),
-  lowTime: require('../../assets/sounds/low-time.wav'),
-  timeout: require('../../assets/sounds/timeout-alarm.wav'),
-};
+// ─── Web Audio Context ────────────────────────────────────────────────────────
 
 let webAudioCtx: any = null;
 
-function getWebAudioContext() {
-  if (typeof window !== 'undefined') {
-    const AudioContextClass =
-      (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      if (!webAudioCtx) {
-        webAudioCtx = new AudioContextClass();
-      }
-      if (webAudioCtx.state === 'suspended') {
-        webAudioCtx.resume().catch(() => {});
-      }
-      return webAudioCtx;
-    }
+function getWebAudioContext(): any {
+  if (typeof window === 'undefined') return null;
+  const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!Ctor) return null;
+  if (!webAudioCtx) {
+    webAudioCtx = new Ctor();
   }
-  return null;
+  if (webAudioCtx.state === 'suspended') {
+    webAudioCtx.resume().catch(() => {});
+  }
+  return webAudioCtx;
 }
+
+// ─── AudioService ─────────────────────────────────────────────────────────────
 
 export class AudioService {
   private static isSoundEnabled: boolean = true;
   private static masterVolume: number = 1.0;
   private static buttonSoundEnabled: boolean = true;
   private static status: AudioStatus = 'loading';
-  private static statusListeners: Set<(status: AudioStatus) => void> = new Set();
+  private static statusListeners: Set<(s: AudioStatus) => void> = new Set();
   private static soundCache: Map<string, Audio.Sound> = new Map();
   private static lastClickTimestamp: number = 0;
   private static isInitializing: boolean = false;
   private static isAudioModeConfigured: boolean = false;
 
+  // ── Status ──────────────────────────────────────────────────────────────────
+
   public static getStatus(): AudioStatus {
     return this.status;
   }
 
-  public static onStatusChange(listener: (status: AudioStatus) => void): () => void {
+  public static onStatusChange(listener: (s: AudioStatus) => void): () => void {
     this.statusListeners.add(listener);
     listener(this.status);
-    return () => {
-      this.statusListeners.delete(listener);
-    };
+    return () => { this.statusListeners.delete(listener); };
   }
 
-  private static notifyStatus(newStatus: AudioStatus) {
-    this.status = newStatus;
-    this.statusListeners.forEach((listener) => {
-      try {
-        listener(newStatus);
-      } catch (e) {
-        console.warn('[AudioService] Listener error:', e);
-      }
-    });
+  private static notifyStatus(s: AudioStatus) {
+    this.status = s;
+    this.statusListeners.forEach(fn => { try { fn(s); } catch {} });
   }
 
-  public static setSoundEnabled(enabled: boolean) {
-    this.isSoundEnabled = enabled;
-  }
+  // ── Settings ────────────────────────────────────────────────────────────────
 
-  public static getSoundEnabled(): boolean {
-    return this.isSoundEnabled;
-  }
-
-  public static setButtonSoundEnabled(enabled: boolean) {
-    this.buttonSoundEnabled = enabled;
-  }
-
-  public static getButtonSoundEnabled(): boolean {
-    return this.buttonSoundEnabled;
-  }
+  public static setSoundEnabled(enabled: boolean)        { this.isSoundEnabled = enabled; }
+  public static getSoundEnabled(): boolean               { return this.isSoundEnabled; }
+  public static setButtonSoundEnabled(enabled: boolean)  { this.buttonSoundEnabled = enabled; }
+  public static getButtonSoundEnabled(): boolean         { return this.buttonSoundEnabled; }
 
   public static setMasterVolume(volume: number) {
-    // Clamp between 0.0 and 1.0
-    const clamped = Math.max(0, Math.min(1, volume));
-    this.masterVolume = clamped;
-
-    // Update volume on cached sound objects
-    this.soundCache.forEach((sound) => {
-      sound.setVolumeAsync(clamped).catch(() => {});
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    this.soundCache.forEach(sound => {
+      sound.setVolumeAsync(this.masterVolume).catch(() => {});
     });
   }
 
-  public static getMasterVolume(): number {
-    return this.masterVolume;
-  }
+  public static getMasterVolume(): number { return this.masterVolume; }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
 
   /**
-   * Initializes audio system: configures audio mode and preloads sound assets.
+   * Initialises the audio subsystem and preloads all sounds.
+   * On Web:    sets up Web Audio API (synthesiser, no file load needed).
+   * On Native: configures Expo AV audio mode, then preloads all three sounds
+   *            from inline base64 data URIs – 100% offline, zero asset-path
+   *            resolution, zero network required.
    */
   public static async init(): Promise<AudioStatus> {
-    if (this.status === 'ready') {
-      return 'ready';
-    }
-    if (this.isInitializing) {
-      return this.status;
-    }
+    if (this.status === 'ready') return 'ready';
+    if (this.isInitializing)    return this.status;
 
     this.isInitializing = true;
     this.notifyStatus('loading');
 
-    // On Web: initialize Web Audio context
+    // ── Web platform ──────────────────────────────────────────────────────────
     if (Platform.OS === 'web') {
       try {
-        const ctx = getWebAudioContext();
-        this.status = ctx ? 'ready' : 'ready';
-        this.isInitializing = false;
-        this.notifyStatus(this.status);
-        return this.status;
+        getWebAudioContext(); // warm up
+        this.notifyStatus('ready');
       } catch (err) {
         console.warn('[AudioService] Web Audio init error:', err);
-        this.status = 'unavailable';
-        this.isInitializing = false;
-        this.notifyStatus(this.status);
-        return this.status;
+        this.notifyStatus('unavailable');
       }
+      this.isInitializing = false;
+      return this.status;
     }
 
-    // On Native Android & iOS: Configure Expo AV mode & preload sound files
+    // ── Native Android / iOS ──────────────────────────────────────────────────
     try {
+      // 1. Configure audio session (do once only)
       if (!this.isAudioModeConfigured) {
         await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+          playsInSilentModeIOS:       true,
+          staysActiveInBackground:    false,
+          shouldDuckAndroid:          true,
+          interruptionModeAndroid:    InterruptionModeAndroid.DuckOthers,
+          interruptionModeIOS:        InterruptionModeIOS.DuckOthers,
           playThroughEarpieceAndroid: false,
         });
         this.isAudioModeConfigured = true;
       }
 
-      // Preload all sounds in parallel
-      const loadPromises = Object.entries(SOUND_ASSETS).map(async ([key, asset]) => {
+      // 2. Preload all sounds in parallel using base64 data URIs.
+      //    { uri: 'data:audio/wav;base64,...' } is passed directly to ExoPlayer –
+      //    no Metro asset resolution, no res/raw lookup, no network permission needed.
+      const keys = Object.keys(SOUND_DATA_URIS) as Array<keyof typeof SOUND_DATA_URIS>;
+      await Promise.all(keys.map(async (key) => {
+        if (this.soundCache.has(key)) return;
         try {
-          if (this.soundCache.has(key)) {
-            return;
-          }
           const { sound } = await Audio.Sound.createAsync(
-            asset,
-            {
-              shouldPlay: false,
-              volume: this.masterVolume,
-            },
-            undefined,
-            true
+            { uri: SOUND_DATA_URIS[key] },
+            { shouldPlay: false, volume: this.masterVolume },
           );
           this.soundCache.set(key, sound);
+          console.log(`[AudioService] Loaded '${key}' via data URI ✓`);
         } catch (err) {
-          console.error(`[AudioService] Error preloading sound '${key}':`, err);
+          console.error(`[AudioService] Failed to preload '${key}':`, err);
         }
-      });
+      }));
 
-      await Promise.all(loadPromises);
-
-      const hasLoadedSounds = this.soundCache.size > 0;
-      this.status = hasLoadedSounds ? 'ready' : 'unavailable';
+      const loaded = this.soundCache.size;
+      console.log(`[AudioService] Preloaded ${loaded}/${keys.length} sounds.`);
+      this.notifyStatus(loaded > 0 ? 'ready' : 'unavailable');
     } catch (err) {
-      console.error('[AudioService] Native audio initialization failed:', err);
-      this.status = 'unavailable';
+      console.error('[AudioService] Native init error:', err);
+      this.notifyStatus('unavailable');
     } finally {
       this.isInitializing = false;
-      this.notifyStatus(this.status);
     }
 
     return this.status;
   }
 
-  /**
-   * Internal sound player with native/web branching and error resilience.
-   */
+  // ── Core Playback ────────────────────────────────────────────────────────────
+
   private static async playSound(
-    key: 'click' | 'lowTime' | 'timeout',
-    customVolumeMultiplier: number = 1.0,
-    forcePlay: boolean = false
+    key: keyof typeof SOUND_DATA_URIS,
+    volumeMultiplier: number = 1.0,
+    forcePlay: boolean = false,
   ): Promise<void> {
-    if (!forcePlay && !this.isSoundEnabled) {
-      return;
-    }
+    if (!forcePlay && !this.isSoundEnabled) return;
 
-    const targetVolume = Math.max(0, Math.min(1, this.masterVolume * customVolumeMultiplier));
-    if (targetVolume <= 0) {
-      return;
-    }
+    const targetVolume = Math.max(0, Math.min(1, this.masterVolume * volumeMultiplier));
+    if (targetVolume <= 0) return;
 
-    // Branch 1: Web platform uses zero-latency synthesized Web Audio
+    // Web: synthesised Web Audio
     if (Platform.OS === 'web') {
       this.playWebAudio(key, targetVolume);
       return;
     }
 
-    // Branch 2: Native Android & iOS playback via Expo AV
+    // Native: Expo AV via pre-cached sound instances
     try {
       let sound = this.soundCache.get(key);
+
+      // On-demand load if cache miss (e.g., called before init() completes)
       if (!sound) {
-        // Attempt on-demand load if not yet in cache
-        const asset = SOUND_ASSETS[key];
-        if (asset) {
-          const result = await Audio.Sound.createAsync(
-            asset,
-            { shouldPlay: false, volume: targetVolume },
-            undefined,
-            true
-          );
-          sound = result.sound;
-          this.soundCache.set(key, sound);
-        }
+        console.warn(`[AudioService] '${key}' not in cache – loading on-demand.`);
+        const { sound: s } = await Audio.Sound.createAsync(
+          { uri: SOUND_DATA_URIS[key] },
+          { shouldPlay: false, volume: targetVolume },
+        );
+        sound = s;
+        this.soundCache.set(key, sound);
       }
 
-      if (sound) {
-        await sound.setVolumeAsync(targetVolume);
-        await sound.replayAsync();
-      }
+      await sound.setVolumeAsync(targetVolume);
+      await sound.replayAsync();
     } catch (err) {
       console.warn(`[AudioService] Native replay failed for '${key}':`, err);
-      // Fallback: try web audio synthesizer if in hybrid environment
-      try {
-        this.playWebAudio(key, targetVolume);
-      } catch {
-        // quiet fallback
-      }
+      // Last-resort: Web Audio fallback (works in Expo Go but not release APK)
+      try { this.playWebAudio(key, targetVolume); } catch {}
     }
   }
 
-  /**
-   * Crisp mechanical clock press click sound
-   */
+  // ── Public Sound Triggers ────────────────────────────────────────────────────
+
+  /** Crisp mechanical clock-press click */
   public static async playClickSound(): Promise<void> {
     if (!this.isSoundEnabled) return;
-
     const now = Date.now();
-    // Debounce rapid overlapping clicks within 45ms
-    if (now - this.lastClickTimestamp < 45) {
-      return;
-    }
+    if (now - this.lastClickTimestamp < 45) return; // debounce 45ms
     this.lastClickTimestamp = now;
-
     await this.playSound('click', 1.0);
   }
 
-  /**
-   * Optional subtle click feedback for UI control buttons
-   */
+  /** Subtle click feedback for UI control buttons */
   public static async playButtonSound(): Promise<void> {
     if (!this.isSoundEnabled || !this.buttonSoundEnabled) return;
-
     const now = Date.now();
-    if (now - this.lastClickTimestamp < 45) {
-      return;
-    }
+    if (now - this.lastClickTimestamp < 45) return;
     this.lastClickTimestamp = now;
-
-    // Play at 50% volume for subtle feedback
     await this.playSound('click', 0.5);
   }
 
-  /**
-   * Subtle low-time tick (warning when active clock is under 10 seconds)
-   */
+  /** Low-time warning tick (< 10 s remaining) */
   public static async playLowTimeTick(): Promise<void> {
     if (!this.isSoundEnabled) return;
     await this.playSound('lowTime', 0.85);
   }
 
-  /**
-   * Time's up / Flagged horn alarm sound
-   */
+  /** Timeout / flag alarm */
   public static async playFlagAlarm(): Promise<void> {
     if (!this.isSoundEnabled) return;
     await this.playSound('timeout', 1.0);
   }
 
-  /**
-   * Test sound player for SettingsModal audition buttons
-   */
-  public static async testSound(key: 'click' | 'lowTime' | 'timeout'): Promise<void> {
-    // If not ready, attempt initialization
-    if (this.status !== 'ready') {
-      await this.init();
-    }
+  /** Audition a sound from Settings – always plays regardless of master toggle */
+  public static async testSound(key: keyof typeof SOUND_DATA_URIS): Promise<void> {
+    if (this.status !== 'ready') await this.init();
     await this.playSound(key, 1.0, true);
   }
 
-  /**
-   * Cleanly unloads all audio instances from device memory.
-   */
+  // ── Cleanup ──────────────────────────────────────────────────────────────────
+
   public static async cleanup(): Promise<void> {
-    const unloadPromises = Array.from(this.soundCache.values()).map(async (sound) => {
-      try {
-        await sound.unloadAsync();
-      } catch (err) {
-        console.warn('[AudioService] Cleanup unload error:', err);
-      }
-    });
-    await Promise.all(unloadPromises);
+    await Promise.all(
+      Array.from(this.soundCache.values()).map(s =>
+        s.unloadAsync().catch(() => {}),
+      ),
+    );
     this.soundCache.clear();
-    this.status = 'unavailable';
     this.notifyStatus('unavailable');
   }
 
-  /**
-   * Web Audio API Synthesizer (for desktop and mobile browsers)
-   */
-  private static playWebAudio(key: 'click' | 'lowTime' | 'timeout', volume: number) {
+  // ── Web Audio Synthesiser ─────────────────────────────────────────────────────
+
+  private static playWebAudio(key: keyof typeof SOUND_DATA_URIS, volume: number) {
     try {
       const ctx = getWebAudioContext();
       if (!ctx) return;
-
       const now = ctx.currentTime;
 
       if (key === 'click') {
-        const osc = ctx.createOscillator();
+        const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-
         osc.type = 'sine';
         osc.frequency.setValueAtTime(850, now);
         osc.frequency.exponentialRampToValueAtTime(120, now + 0.045);
-
         gain.gain.setValueAtTime(0.7 * volume, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.046);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 0.046);
       } else if (key === 'lowTime') {
-        const osc = ctx.createOscillator();
+        const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(1100, now);
-
         gain.gain.setValueAtTime(0.35 * volume, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.036);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 0.036);
       } else if (key === 'timeout') {
-        [0, 0.16].forEach((offset) => {
-          const osc = ctx.createOscillator();
+        [0, 0.16].forEach(offset => {
+          const osc  = ctx.createOscillator();
           const gain = ctx.createGain();
-
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(offset === 0 ? 587 : 440, now + offset);
-
           gain.gain.setValueAtTime(0.55 * volume, now + offset);
           gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.18);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc.start(now + offset);
-          osc.stop(now + offset + 0.19);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now + offset); osc.stop(now + offset + 0.19);
         });
       }
     } catch (e) {
